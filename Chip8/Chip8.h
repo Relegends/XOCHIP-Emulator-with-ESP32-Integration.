@@ -1,6 +1,6 @@
 #pragma once
 #include <stdint.h>
-#include <fstream>;
+#include <fstream>
 #include <string>
 
 class Chip8

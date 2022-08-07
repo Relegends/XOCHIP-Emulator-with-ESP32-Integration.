@@ -7,9 +7,9 @@ Chip8::Chip8()
 
 void Chip8::LoadGame(const std::string& gameName)
 {
-	std::fstream gameFile(gameName, std::fstream::in | std::fstream::binary);
+	std::ifstream gameFile(gameName, std::ifstream::binary);
 
-	if (gameFile) {
+	if (gameFile.is_open()) {
 		gameFile.seekg(0, gameFile.end);
 		int fileSize = gameFile.tellg();
 		gameFile.seekg(0, gameFile.beg);
