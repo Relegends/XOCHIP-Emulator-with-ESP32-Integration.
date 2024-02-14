@@ -2,7 +2,9 @@
 
 Chip8::Chip8()
 {
-	pc = START_ADDRESS;
+	m_pc = START_ADDRESS;
+	m_memory = {};
+	m_V = {};
 }
 
 void Chip8::LoadGame(const std::string& gameName)
@@ -21,10 +23,10 @@ void Chip8::LoadGame(const std::string& gameName)
 		gameFile.close();
 
 		for (int i = 0; i < fileSize; i++) {
-			memory[pc++] = buffer[i];
+			m_memory[m_pc++] = buffer[i];
 		}
 
-		pc = START_ADDRESS;
+		m_pc = START_ADDRESS;
 
 		delete[] buffer;
 	}
