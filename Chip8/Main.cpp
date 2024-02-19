@@ -1,9 +1,16 @@
 #include <string.h>
 #include <iostream>
+#include <memory>
+#include <SDL.h>
 
 #include "Chip8.h"
+#include "Display.h"
 
-int main(int argc, char** argv)
+//Screen dimension constants
+const int SCREEN_WIDTH = 640;
+const int SCREEN_HEIGHT = 480;
+
+int main(int argc, char* argv[])
 {
 	/*if (argc != 2) {
 		std::cerr << "Usage: " << argv[0] << " <ROM>" << std::endl;
@@ -18,6 +25,11 @@ int main(int argc, char** argv)
 
 	emulator.LoadGame(romFile);
 
-	
+	Display display;
 
+	display.Init("Chip 8", SCREEN_WIDTH, SCREEN_HEIGHT);
+
+	display.Update();
+	
+	return 0;
 }

@@ -13,7 +13,7 @@ void Chip8::LoadGame(const std::string& gameName)
 
 	if (gameFile.is_open()) {
 		gameFile.seekg(0, gameFile.end);
-		int fileSize = gameFile.tellg();
+		std::streamoff fileSize = gameFile.tellg();
 		gameFile.seekg(0, gameFile.beg);
 
 		char* buffer = new char[fileSize];
