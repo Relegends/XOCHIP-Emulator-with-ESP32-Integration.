@@ -3,6 +3,7 @@
 #include <fstream>
 #include <string>
 #include <array>
+#include <cstdlib>
 
 class Chip8
 {
@@ -60,11 +61,13 @@ private:
 	uint16_t m_indexRegister; // Only the lowest 12 bits are used. Points to locations in the memory (0x000 - 0xFFF)
 	uint16_t m_pc; // Program Counter. Stores the currently executing address.
 
-	std::unique_ptr<uint16_t> m_sp;
 	std::array<uint16_t, 16> m_stack;
+	std::array<uint16_t, 16>::iterator m_sp;
 
 	uint8_t m_delayTimer;
 	uint8_t m_soundTimer;
+
+	std::array<uint8_t, 64 * 32> m_displayContent;
 
 	const uint16_t START_ADDRESS = 0x200;
 

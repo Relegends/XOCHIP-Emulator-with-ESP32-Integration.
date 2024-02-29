@@ -5,7 +5,13 @@ Chip8::Chip8()
 	m_pc = START_ADDRESS;
 	m_memory = {};
 	m_V = {};
+
 	m_stack = {};
+	m_sp = m_stack.begin();
+
+	m_displayContent = {};
+
+	std::srand(std::time(0));
 }
 
 uint16_t Chip8::Fetch()
@@ -20,7 +26,7 @@ uint16_t Chip8::Fetch()
 }
 
 void Chip8::Decode(uint16_t opcode)
-{	
+{
 	m_decoder.type = (opcode >> 12) & 0x000F;
 	m_decoder.nnn = opcode & 0x0FFF;
 	m_decoder.kk = opcode & 0x00FF;
@@ -130,4 +136,155 @@ void Chip8::LoadGame(const std::string& gameName)
 
 		delete[] buffer;
 	}
+}
+
+void Chip8::Fun_00E0()
+{
+	printf("CLS");
+	m_displayContent.fill(0);
+}
+
+void Chip8::Fun_00EE()
+{
+	printf("CALL %4x", m_decoder.nnn);
+	m_pc = m_stack.front();
+	m_sp--;
+}
+
+void Chip8::Fun_1nnn()
+{
+	m_pc = m_decoder.nnn;
+}
+
+void Chip8::Fun_2nnn()
+{
+	m_sp++;
+}
+
+void Chip8::Fun_3xkk()
+{
+	if (m_V[m_decoder.x] == m_decoder.kk)
+		m_pc += 2;
+}
+
+void Chip8::Fun_4xkk()
+{
+	if (m_V[m_decoder.x] != m_decoder.kk)
+		m_pc += 2;
+}
+
+void Chip8::Fun_5xy0()
+{
+	if (m_V[m_decoder.x] == m_V[m_decoder.y])
+		m_pc += 2;
+}
+
+void Chip8::Fun_6xkk()
+{
+	if (m_V[m_decoder.x] == m_decoder.kk)
+		m_pc += 2;
+}
+
+void Chip8::Fun_7xkk()
+{
+	m_V[m_decoder.x] += m_decoder.kk;
+}
+
+void Chip8::Fun_8xy0()
+{
+	m_V[m_decoder.x] = m_V[m_decoder.y];
+}
+
+void Chip8::Fun_8xy1()
+{
+	m_V[m_decoder.x] |= m_V[m_decoder.y];
+}
+
+void Chip8::Fun_8xy2()
+{
+	m_V[m_decoder.x] &= m_V[m_decoder.y];
+}
+
+void Chip8::Fun_8xy3()
+{
+	m_V[m_decoder.x] ^= m_V[m_decoder.y];
+}
+
+void Chip8::Fun_8xy4()
+{
+	uint16_t result = m_V[m_decoder.x] + m_V[m_decoder.y];
+	m_V[m_decoder.x] = result & 0x00FF;
+
+	m_V[0xF] = (result > 0xFF);
+}
+
+void Chip8::Fun_8xy5()
+{
+	uint16_t result = m_V[m_decoder.y] - m_V[m_decoder.x];
+
+	m_V[0xF] = (m_V[m_decoder.x] > m_V[m_decoder.y]);
+	m_V[m_decoder.x] = result & 0x00FF;
+}
+
+void Chip8::Fun_8xy6()
+{
+	m_V[0xF] = ((m_V[m_decoder.x] & 0x01) == 1);
+	m_V[m_decoder.x] /= 2;
+}
+
+void Chip8::Fun_8xy7()
+{
+	uint16_t result = m_V[m_decoder.x] - m_V[m_decoder.y];
+
+	m_V[0xF] = (m_V[m_decoder.y] > m_V[m_decoder.x]);
+	m_V[m_decoder.x] = result & 0x00FF;
+}
+
+void Chip8::Fun_8xyE()
+{
+	m_V[0xF] = ((m_V[m_decoder.x] >> 7) == 1);
+	m_V[m_decoder.x] *= 2;
+}
+
+void Chip8::Fun_9xy0()
+{
+	if (m_V[m_decoder.x] != m_V[m_decoder.y])
+		m_pc += 2;
+}
+
+void Chip8::Fun_Annn()
+{
+	m_indexRegister = m_decoder.nnn;
+}
+
+void Chip8::Fun_Bnnn()
+{
+	m_pc = m_decoder.nnn + m_V[m_decoder.x];
+}
+
+void Chip8::Fun_Cxkk()
+{
+	uint8_t random = std::rand() % 256;
+
+	m_V[m_decoder.x] &= random;
+}
+
+void Chip8::Fun_Dxyn()
+{
+	uint8_t xPos = m_V[m_decoder.x] % 64;
+	uint8_t yPos = m_V[m_decoder.y];
+
+
+
+	for (int i = 0; i < m_decoder.n; i++)
+	{
+
+	}
+}
+
+void Chip8::Fun_Ex9E()
+{
+	//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+	/*if ()
+		m_pc += 2;*/
 }
