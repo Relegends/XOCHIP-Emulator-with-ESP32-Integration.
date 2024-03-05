@@ -6,10 +6,6 @@
 #include "Chip8.h"
 #include "Display.h"
 
-//Screen dimension constants
-const int SCREEN_WIDTH = 640;
-const int SCREEN_HEIGHT = 480;
-
 int main(int argc, char* argv[])
 {
 	/*if (argc != 2) {
@@ -24,12 +20,6 @@ int main(int argc, char* argv[])
 	Chip8 emulator;
 
 	emulator.LoadGame(romFile);
-
-	Display display;
-
-	display.Init("Chip 8", SCREEN_WIDTH, SCREEN_HEIGHT);
-
-	display.Update();
 	
 	return 0;
 }

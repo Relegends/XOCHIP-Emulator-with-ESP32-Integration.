@@ -9,7 +9,10 @@ Chip8::Chip8()
 	m_stack = {};
 	m_sp = m_stack.begin();
 
-	m_displayContent = {};
+	m_decoder = {};
+
+	if (!display.Init("Chip 8", SCREEN_WIDTH, SCREEN_HEIGHT))
+		exit(-1);
 
 	std::srand(std::time(0));
 }
@@ -141,7 +144,7 @@ void Chip8::LoadGame(const std::string& gameName)
 void Chip8::Fun_00E0()
 {
 	printf("CLS");
-	m_displayContent.fill(0);
+	display.CLS();
 }
 
 void Chip8::Fun_00EE()

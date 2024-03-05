@@ -14,14 +14,15 @@ public:
 	void Update();
 	void Close();
 
+	void CLS();	// Clear Screen
+
 private:
 	unsigned int m_windowHeight;
 	unsigned int m_windowWidth;
+	bool m_closeWindow;
 
 	std::string m_windowName;
 	std::unique_ptr < SDL_Window, std::function<void(SDL_Window*)>> m_window;
-	std::unique_ptr<SDL_Surface, std::function<void(SDL_Surface*)>> m_screenSurface;
-
-	bool m_closeWindow;
+	std::unique_ptr<SDL_Renderer, std::function<void(SDL_Renderer*)>> m_renderer;
 };
 

@@ -5,6 +5,8 @@
 #include <array>
 #include <cstdlib>
 
+#include "Display.h"
+
 class Chip8
 {
 public:
@@ -67,9 +69,13 @@ private:
 	uint8_t m_delayTimer;
 	uint8_t m_soundTimer;
 
-	std::array<uint8_t, 64 * 32> m_displayContent;
-
 	const uint16_t START_ADDRESS = 0x200;
+
+	//Screen dimension constants
+	const int SCREEN_WIDTH = 640;
+	const int SCREEN_HEIGHT = 480;
+	
+	Display display;
 
 	struct OPCODE_DECO
 	{

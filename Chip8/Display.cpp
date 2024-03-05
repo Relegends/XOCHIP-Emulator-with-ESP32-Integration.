@@ -26,10 +26,16 @@ bool Display::Init(const std::string& name, const unsigned int width, const unsi
 		}
 		else
 		{
-			m_screenSurface = std::unique_ptr<SDL_Surface, std::function<void(SDL_Surface*)>>(
-				SDL_GetWindowSurface(m_window.get()),
-				SDL_FreeSurface
+			m_renderer = std::unique_ptr<SDL_Renderer, std::function<void(SDL_Renderer*)>>(
+				SDL_CreateRenderer(m_window.get(), NULL, SDL_RENDERER_ACCELERATED),
+				SDL_DestroyRenderer
 			);
+
+			if (m_renderer = nullptr)
+			{
+				std::cout << "Renderer could not be created! SDL_Error: " << SDL_GetError() << std::endl;
+				return false;
+			}
 		}
 
 	}
@@ -58,8 +64,13 @@ void Display::Update()
 
 void Display::Close()
 {
-	m_screenSurface.reset();
+	m_renderer.reset();
 	m_window.reset();
 
 	SDL_Quit();
+}
+
+void Display::CLS()
+{
+	SDL_RenderClear(m_renderer.get());
 }
