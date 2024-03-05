@@ -26,8 +26,8 @@ private:
 	unsigned int m_windowWidth;
 	bool m_closeWindow;
 
-	unsigned int displayWidth;
-	unsigned int displayHeight;
+	unsigned int m_displayWidth;
+	unsigned int m_displayHeight;
 
 	std::string m_windowName;
 
