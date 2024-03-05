@@ -40,6 +40,8 @@ bool Display::Init(const std::string& name, const unsigned int width, const unsi
 
 	}
 
+	Display::CLS();
+
 	return true;
 }
 
@@ -72,5 +74,37 @@ void Display::Close()
 
 void Display::CLS()
 {
+	std::fill(m_display.begin(), m_display.end(), 0);
 	SDL_RenderClear(m_renderer.get());
+}
+
+void Display::DrawPixel(unsigned int x, unsigned int y, bool colored)
+{
+	SDL_Rect pixel;
+
+	unsigned int scaleX = static_cast<unsigned int>(m_windowWidth / 64);
+	unsigned int scaleY = static_cast<unsigned int>(m_windowHeight / 32);
+
+	pixel.x = x;
+	pixel.y = y;
+	pixel.w = scaleX;
+	pixel.h = scaleY;
+
+	if (colored)
+		SDL_SetRenderDrawColor(m_renderer.get(), 0xFF, 0xFF, 0xFF, 0xFF);
+	else
+		SDL_GetRenderDrawColor(m_renderer.get(), 0x00, 0x00, 0x00, 0x00);
+
+	SDL_RenderFillRect(m_renderer.get(), &pixel);
+}
+
+void Display::Render()
+{
+	for (int row = 0; row < m_displayHeight; row++)
+	{
+		for (int col = 0; col < m_displayWidth; col++)
+		{
+			Display::DrawPixel(row, col, m_display[m_displayWidth * row + col]);
+		}
+	}
 }
