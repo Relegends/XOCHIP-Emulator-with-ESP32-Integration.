@@ -298,3 +298,8 @@ void Chip8::Fun_Ex9E()
 	/*if ()
 		m_pc += 2;*/
 }
+
+void Chip8::Fun_Fx07()
+{
+	m_V[m_decoder.x] = m_delayTimer;
+}

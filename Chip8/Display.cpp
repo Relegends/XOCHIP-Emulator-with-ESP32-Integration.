@@ -100,9 +100,9 @@ void Display::DrawPixel(unsigned int x, unsigned int y, bool colored)
 
 void Display::Render()
 {
-	for (int row = 0; row < m_displayHeight; row++)
+	for (uint8_t row = 0; row < m_displayHeight; row++)
 	{
-		for (int col = 0; col < m_displayWidth; col++)
+		for (uint8_t col = 0; col < m_displayWidth; col++)
 		{
 			Display::DrawPixel(row, col, m_display[m_displayWidth * row + col]);
 		}
