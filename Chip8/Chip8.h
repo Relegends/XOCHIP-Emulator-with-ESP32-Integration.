@@ -75,7 +75,7 @@ private:
 	const int SCREEN_WIDTH = 640;
 	const int SCREEN_HEIGHT = 480;
 	
-	Display display;
+	Display m_display;
 
 	struct OPCODE_DECO
 	{

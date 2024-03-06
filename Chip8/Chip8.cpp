@@ -11,7 +11,7 @@ Chip8::Chip8()
 
 	m_decoder = {};
 
-	if (!display.Init("Chip 8", SCREEN_WIDTH, SCREEN_HEIGHT))
+	if (!m_display.Init("Chip 8", SCREEN_WIDTH, SCREEN_HEIGHT))
 		exit(-1);
 
 	std::srand(std::time(0));
@@ -144,7 +144,7 @@ void Chip8::LoadGame(const std::string& gameName)
 void Chip8::Fun_00E0()
 {
 	printf("CLS");
-	display.CLS();
+	m_display.CLS();
 }
 
 void Chip8::Fun_00EE()
@@ -274,14 +274,21 @@ void Chip8::Fun_Cxkk()
 
 void Chip8::Fun_Dxyn()
 {
-	uint8_t xPos = m_V[m_decoder.x] % 64;
+	uint8_t xPos = m_V[m_decoder.x];
 	uint8_t yPos = m_V[m_decoder.y];
 
+	m_V[0xF] = 0;
 
-
-	for (int i = 0; i < m_decoder.n; i++)
+	for (int row = 0; row < m_decoder.n; row++)
 	{
-
+		uint8_t spriteRow = m_memory[m_indexRegister + row];
+		for (int col = 0; col < 8; col++)
+		{
+			bool pixel = (spriteRow >> col) & 0x1;
+			bool conflict = m_display.ChangePixelValue(xPos + col, yPos + row, pixel);
+			if (conflict)
+				m_V[0xF] = 1;
+		}
 	}
 }
 

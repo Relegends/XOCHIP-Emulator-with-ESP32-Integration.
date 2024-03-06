@@ -108,3 +108,18 @@ void Display::Render()
 		}
 	}
 }
+
+bool Display::ChangePixelValue(unsigned int x, unsigned int y, const bool value)
+{
+	// Wrapping screen
+	x %= m_displayWidth;
+	y %= m_displayHeight;
+
+	int offset = m_displayWidth * y + x;
+
+	bool conflict = (m_display[offset]); // If the pixel was alredy on --> CONFLICT
+
+	m_display[offset] = (m_display[offset] ^ value); // Paint sprite with XOR
+
+	return conflict;
+}

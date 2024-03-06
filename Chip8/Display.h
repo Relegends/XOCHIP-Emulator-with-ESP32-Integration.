@@ -17,9 +17,13 @@ public:
 
 	void CLS();	// Clear Screen
 
-	void DrawPixel(unsigned int x, unsigned int y, bool colored);
-
 	void Render();
+
+	bool ChangePixelValue(unsigned int x, unsigned int y, const bool value); // Returns wheter there was a collision or not
+
+private:
+
+	void DrawPixel(unsigned int x, unsigned int y, bool colored);
 
 private:
 	unsigned int m_windowHeight;
