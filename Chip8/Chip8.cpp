@@ -28,8 +28,10 @@ uint16_t Chip8::Fetch()
 	return opcode;
 }
 
-void Chip8::Decode(uint16_t opcode)
+const std::function<void()>& Chip8::Decode(uint16_t opcode)
 {
+	std::function<void()> nextInstruction;
+
 	m_decoder.type = (opcode >> 12) & 0x000F;
 	m_decoder.nnn = opcode & 0x0FFF;
 	m_decoder.kk = opcode & 0x00FF;
@@ -40,7 +42,7 @@ void Chip8::Decode(uint16_t opcode)
 	switch (m_decoder.type)
 	{
 	case 0x0:
-		if (m_decoder.nnn == 0x0E0) Fun_00E0();
+		if (m_decoder.nnn == 0x0E0)  nextInstruction = std::bind(&Chip8::Fun_00E0, this);
 		else if (m_decoder.nnn == 0x0EE) Fun_00EE();
 		break;
 	case 0x1:
@@ -139,6 +141,14 @@ void Chip8::LoadGame(const std::string& gameName)
 
 		delete[] buffer;
 	}
+}
+
+void Chip8::Simulate_Cycle()
+{
+	uint16_t opcode = Chip8::Fetch();
+	Chip8::Decode(opcode);
+
+
 }
 
 void Chip8::Fun_00E0()

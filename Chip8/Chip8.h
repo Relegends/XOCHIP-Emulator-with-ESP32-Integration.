@@ -6,6 +6,7 @@
 #include <cstdlib>
 
 #include "Display.h"
+#include "Keyboard.h"
 
 class Chip8
 {
@@ -15,10 +16,12 @@ public:
 	
 	void LoadGame(const std::string& gameName);
 
+	void Simulate_Cycle();
+
 private:
 
 	uint16_t Fetch();
-	void Decode(uint16_t opcode);
+	const std::function<void()>& Decode(uint16_t opcode);
 
 	void Fun_00E0(); // CLS
 	void Fun_00EE(); // RET
@@ -76,6 +79,7 @@ private:
 	const int SCREEN_HEIGHT = 480;
 	
 	Display m_display;
+	Keyboard m_keyboard;
 
 	struct OPCODE_DECO
 	{
