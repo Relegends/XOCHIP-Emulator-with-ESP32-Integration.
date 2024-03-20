@@ -21,7 +21,7 @@ public:
 private:
 
 	uint16_t Fetch();
-	const std::function<void()>& Decode(uint16_t opcode);
+	const std::function<void()> Decode(uint16_t opcode);
 
 	void Fun_00E0(); // CLS
 	void Fun_00EE(); // RET

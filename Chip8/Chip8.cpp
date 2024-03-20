@@ -1,4 +1,5 @@
 #include "Chip8.h"
+#include <iostream>
 
 Chip8::Chip8()
 {
@@ -28,10 +29,8 @@ uint16_t Chip8::Fetch()
 	return opcode;
 }
 
-const std::function<void()>& Chip8::Decode(uint16_t opcode)
+const std::function<void()> Chip8::Decode(uint16_t opcode)
 {
-	std::function<void()> nextInstruction;
-
 	m_decoder.type = (opcode >> 12) & 0x000F;
 	m_decoder.nnn = opcode & 0x0FFF;
 	m_decoder.kk = opcode & 0x00FF;
@@ -42,80 +41,57 @@ const std::function<void()>& Chip8::Decode(uint16_t opcode)
 	switch (m_decoder.type)
 	{
 	case 0x0:
-		if (m_decoder.nnn == 0x0E0)  nextInstruction = std::bind(&Chip8::Fun_00E0, this);
-		else if (m_decoder.nnn == 0x0EE) Fun_00EE();
-		break;
+		if (m_decoder.nnn == 0x0E0)  return std::bind(&Chip8::Fun_00E0, this);
+		else if (m_decoder.nnn == 0x0EE)  return std::bind(&Chip8::Fun_00EE, this);
 	case 0x1:
-		Fun_1nnn();
-		break;
+		return std::bind(&Chip8::Fun_1nnn, this);
 	case 0x2:
-		Fun_2nnn();
-		break;
+		return std::bind(&Chip8::Fun_2nnn, this);
 	case 0x3:
-		Fun_3xkk();
-		break;
+		return std::bind(&Chip8::Fun_3xkk, this);
 	case 0x4:
-		Fun_4xkk();
-		break;
+		return std::bind(&Chip8::Fun_4xkk, this);
 	case 0x5:
-		Fun_5xy0();
-		break;
+		return std::bind(&Chip8::Fun_5xy0, this);
 	case 0x6:
-		Fun_6xkk();
-		break;
+		return std::bind(&Chip8::Fun_6xkk, this);
 	case 0x7:
-		Fun_7xkk();
-		break;
+		return std::bind(&Chip8::Fun_7xkk, this);
 	case 0x8:
 		switch (m_decoder.n)
 		{
 		case 0x0:
-			Fun_8xy0();
-			break;
+			return std::bind(&Chip8::Fun_8xy0, this);
 		case 0x1:
-			Fun_8xy1();
-			break;
+			return std::bind(&Chip8::Fun_8xy1, this);
 		case 0x2:
-			Fun_8xy2();
-			break;
+			return std::bind(&Chip8::Fun_8xy2, this);
 		case 0x3:
-			Fun_8xy3();
-			break;
+			return std::bind(&Chip8::Fun_8xy3, this);
 		case 0x4:
-			Fun_8xy4();
-			break;
+			return std::bind(&Chip8::Fun_8xy4, this);
 		case 0x5:
-			Fun_8xy5();
-			break;
+			return std::bind(&Chip8::Fun_8xy5, this);
 		case 0x6:
-			Fun_8xy6();
-			break;
+			return std::bind(&Chip8::Fun_8xy6, this);
 		case 0x7:
-			Fun_8xy7();
-			break;
+			return std::bind(&Chip8::Fun_8xy7, this);
 		case 0xE:
-			Fun_8xyE();
-			break;
-		default:
-			// ERROR
-			break;
+			return std::bind(&Chip8::Fun_8xyE, this);
 		}
 	case 0x9:
-		Fun_9xy0();
-		break;
+		return std::bind(&Chip8::Fun_9xy0, this);
 	case 0xA:
-		Fun_Annn();
-		break;
+		return std::bind(&Chip8::Fun_Annn, this);
 	case 0xB:
-		Fun_Bnnn();
-		break;
+		return std::bind(&Chip8::Fun_Bnnn, this);
 	case 0xC:
-		Fun_Cxkk();
-		break;
-	default:
-		// ERROR
-		break;
+		return std::bind(&Chip8::Fun_Cxkk, this);
 	}
+
+	// If the opcode does not exit -> ERROR
+	std::cout << "ERROR: Decoded opcode not implemented!" << std::endl;
+	exit(-1);
 }
 
 void Chip8::LoadGame(const std::string& gameName)
