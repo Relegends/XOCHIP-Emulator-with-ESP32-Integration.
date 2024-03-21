@@ -11,7 +11,7 @@ public:
 	Display() = default;
 	~Display() = default;
 
-	bool Init(const std::string& name, const unsigned int width, const unsigned int height);
+	bool Init(const std::string& name, const unsigned int width, const unsigned int height, const uint32_t mainColor, const uint32_t backgroundColor);
 	void Update();
 	void Close();
 
@@ -28,6 +28,9 @@ private:
 private:
 	unsigned int m_windowHeight;
 	unsigned int m_windowWidth;
+	uint32_t m_mainColor;
+	uint32_t m_backgroundColor;
+
 	bool m_closeWindow;
 
 	unsigned int m_displayWidth;

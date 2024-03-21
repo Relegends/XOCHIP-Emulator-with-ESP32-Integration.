@@ -7,6 +7,7 @@
 
 #include "Display.h"
 #include "Keyboard.h"
+#include "Configuration.h"
 
 class Chip8
 {
@@ -74,10 +75,7 @@ private:
 
 	const uint16_t START_ADDRESS = 0x200;
 
-	//Screen dimension constants
-	const int SCREEN_WIDTH = 640;
-	const int SCREEN_HEIGHT = 480;
-	
+	Configuration m_config;	
 	Display m_display;
 	Keyboard m_keyboard;
 

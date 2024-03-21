@@ -12,7 +12,9 @@ Chip8::Chip8()
 
 	m_decoder = {};
 
-	if (!m_display.Init("Chip 8", SCREEN_WIDTH, SCREEN_HEIGHT))
+	m_config.Init("./Config/Config.toml");
+
+	if (!m_display.Init("Chip 8", m_config.GetDisplayWidth(), m_config.GetDisplayHeight(), m_config.GetDisplayMainColor(), m_config.GetDisplayBackgroundColor()))
 		exit(-1);
 
 	std::srand(std::time(0));

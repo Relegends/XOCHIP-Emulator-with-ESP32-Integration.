@@ -1,11 +1,13 @@
 #include "Display.h"
 #include <iostream>
 
-bool Display::Init(const std::string& name, const unsigned int width, const unsigned int height)
+bool Display::Init(const std::string& name, const unsigned int width, const unsigned int height, const uint32_t mainColor, const uint32_t backgroundColor)
 {
 	m_windowName = name;
 	m_windowWidth = width;
 	m_windowHeight = height;
+	m_mainColor = mainColor;
+	m_backgroundColor = backgroundColor;
 
 	if (SDL_Init(SDL_INIT_VIDEO) < 0)
 	{
@@ -91,9 +93,13 @@ void Display::DrawPixel(unsigned int x, unsigned int y, bool colored)
 	pixel.h = scaleY;
 
 	if (colored)
-		SDL_SetRenderDrawColor(m_renderer.get(), 0xFF, 0xFF, 0xFF, 0xFF);
+		SDL_SetRenderDrawColor(m_renderer.get(),
+			(m_mainColor >> 24) & 0xFF, (m_mainColor >> 16) & 0xFF, (m_mainColor >> 8) & 0xFF,
+			m_mainColor & 0xFF);
 	else
-		SDL_GetRenderDrawColor(m_renderer.get(), 0x00, 0x00, 0x00, 0x00);
+		SDL_SetRenderDrawColor(m_renderer.get(), 
+			(m_backgroundColor >> 24) & 0xFF, (m_backgroundColor >> 16) & 0xFF, (m_backgroundColor >> 8) & 0xFF,
+			m_backgroundColor & 0xFF);
 
 	SDL_RenderFillRect(m_renderer.get(), &pixel);
 }
