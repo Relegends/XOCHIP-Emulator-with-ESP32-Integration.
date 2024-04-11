@@ -7,8 +7,8 @@ void Configuration::Init(std::string configPath)
 	// Display config
 	m_displayWidth = config["Display"]["resolution"][0].value_or(0);
 	m_displayHeight = config["Display"]["resolution"][1].value_or(0);
-	m_displayMainColor = config["Display"]["mainColor"].value_or(0);
-	m_displayBackgroundColor = config["Display"]["backgroundColor"].value_or(0);
+	m_displayMainColor = config["Display"]["mainColor"].value_or<uint32_t>(0xFFFFFFFF);
+	m_displayBackgroundColor = config["Display"]["backgroundColor"].value_or<uint32_t>(0x00000000);
 }
 
 unsigned int Configuration::GetDisplayWidth() const
