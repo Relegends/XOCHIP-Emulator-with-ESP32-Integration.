@@ -4,8 +4,10 @@ void Keyboard::Update(SDL_KeyboardEvent keyboardEvent)
 {
 	SDL_Keycode keycode = keyboardEvent.keysym.sym;
 
-	if (m_keyboard.find(keycode) != m_keyboard.end())
+	const char* keyName = SDL_GetKeyName(keycode);
+
+	if (m_keyboard.find(*keyName) != m_keyboard.end())
 	{
-		m_keyboard[keycode] = keyboardEvent.state;
+		m_keyboard[*keyName] = keyboardEvent.state;
 	}
 }

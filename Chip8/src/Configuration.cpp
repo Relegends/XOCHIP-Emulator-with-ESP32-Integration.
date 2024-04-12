@@ -1,32 +1,42 @@
 #include "Configuration.h"
+#include <unordered_map>
+#include <iostream>
 
 void Configuration::Init(std::string configPath)
 {
-	auto config = toml::parse_file(configPath);
+	m_config = toml::parse_file(configPath);
+	std::unordered_map<char, bool> a;
+	auto arr = m_config["Keyboard"].as_table();
+	std::unordered_map<char, bool> map;
+	arr->for_each([&map](auto&& el)
+		{
+			if constexpr (toml::is_string<decltype(el)>)
+				map[toml::value<char>(el)] = 0;
+		});
 
-	// Display config
-	m_displayWidth = config["Display"]["resolution"][0].value_or(0);
-	m_displayHeight = config["Display"]["resolution"][1].value_or(0);
-	m_displayMainColor = config["Display"]["mainColor"].value_or<uint32_t>(0xFFFFFFFF);
-	m_displayBackgroundColor = config["Display"]["backgroundColor"].value_or<uint32_t>(0x00000000);
 }
 
 unsigned int Configuration::GetDisplayWidth() const
 {
-	return m_displayWidth;
+	return m_config["Display"]["resolution"][0].value_or(0);
 }
 
 unsigned int Configuration::GetDisplayHeight() const
 {
-	return m_displayHeight;
+	return m_config["Display"]["resolution"][1].value_or(0);
 }
 
 uint32_t Configuration::GetDisplayMainColor() const
 {
-	return m_displayMainColor;
+	return m_config["Display"]["mainColor"].value_or<uint32_t>(0xFFFFFFFF);
 }
 
 uint32_t Configuration::GetDisplayBackgroundColor() const
 {
-	return m_displayBackgroundColor;
+	return m_config["Display"]["backgroundColor"].value_or<uint32_t>(0x00000000);
 }
+
+void Configuration::GetInputMap(std::unordered_map<char, bool>& m_keyboard) const
+{
+}
+

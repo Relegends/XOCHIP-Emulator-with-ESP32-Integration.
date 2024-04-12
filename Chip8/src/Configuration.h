@@ -1,5 +1,6 @@
 #pragma once
 #include <toml.hpp>
+#include <unordered_map>
 
 class Configuration
 {
@@ -13,10 +14,9 @@ public:
 	uint32_t GetDisplayMainColor() const;
 	uint32_t GetDisplayBackgroundColor() const;
 
+	void GetInputMap(std::unordered_map<char, bool>& m_keyboard) const;
+
 private:
-	unsigned int m_displayWidth;
-	unsigned int m_displayHeight;
-	uint32_t m_displayMainColor;
-	uint32_t m_displayBackgroundColor;
+	toml::parse_result m_config;
 };
 

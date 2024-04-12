@@ -129,6 +129,11 @@ void Chip8::Simulate_Cycle()
 	ExecuteNextInstruction();
 }
 
+void Chip8::Run()
+{
+
+}
+
 void Chip8::Fun_00E0()
 {
 	printf("CLS");
