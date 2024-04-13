@@ -12,7 +12,7 @@ unsigned int Configuration::GetWindowWidth() const
 
 unsigned int Configuration::GetWindowHeight() const
 {
-	return m_config["Display"]["windowResolution"][0].value_or(1080);
+	return m_config["Display"]["windowResolution"][1].value_or(1080);
 }
 
 unsigned int Configuration::GetDisplayWidth() const
