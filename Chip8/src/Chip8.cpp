@@ -1,22 +1,19 @@
 #include "Chip8.h"
 #include <iostream>
 
-Chip8::Chip8()
+Chip8::Chip8() : 
+	m_V({}),
+	m_pc(START_ADDRESS),
+	m_memory({}),
+	m_stack({}),
+	m_sp(m_stack.begin()),
+	m_config("./Config/Config.toml"),
+	m_display("Chip 8", m_config.GetWindowWidth(), m_config.GetWindowHeight(), m_config.GetDisplayWidth(), m_config.GetDisplayHeight(),
+		m_config.GetDisplayMainColor(), m_config.GetDisplayBackgroundColor()),
+	m_keyboard({m_config.GetInputMap()}),
+	m_decoder({})
 {
-	m_pc = START_ADDRESS;
-	m_memory = {};
-	m_V = {};
-
-	m_stack = {};
-	m_sp = m_stack.begin();
-
-	m_decoder = {};
-
-	m_config.Init("./Config/Config.toml");
-
-	if (!m_display.Init("Chip 8", m_config.GetDisplayWidth(), m_config.GetDisplayHeight(), m_config.GetDisplayMainColor(), m_config.GetDisplayBackgroundColor()))
-		exit(-1);
-
+	if (!m_display.Init()) exit(-1);
 	std::srand(std::time(0));
 }
 

@@ -1,5 +1,6 @@
 [Display]
-resolution = [1080, 1920]
+windowResolution = [1920, 1080]
+displayResolution = [64, 32]
 mainColor = 0xFFFFFFFF
 backgroundColor = 0x00000000
 

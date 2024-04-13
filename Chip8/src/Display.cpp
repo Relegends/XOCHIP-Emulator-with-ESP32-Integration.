@@ -1,14 +1,22 @@
 #include "Display.h"
 #include <iostream>
 
-bool Display::Init(const std::string& name, const unsigned int width, const unsigned int height, const uint32_t mainColor, const uint32_t backgroundColor)
+Display::Display(const std::string& name,
+	const unsigned int windowWidth, const unsigned int windowHeight,
+	const unsigned int displayWidth, const unsigned int displayHeight,
+	const uint32_t mainColor, const uint32_t backgroundColor)
 {
 	m_windowName = name;
-	m_windowWidth = width;
-	m_windowHeight = height;
+	m_windowWidth = windowWidth;
+	m_windowHeight = windowHeight;
+	m_displayWidth = displayWidth;
+	m_displayHeight = displayHeight;
 	m_mainColor = mainColor;
 	m_backgroundColor = backgroundColor;
+}
 
+bool Display::Init()
+{
 	if (SDL_Init(SDL_INIT_VIDEO) < 0)
 	{
 		std::cout << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;

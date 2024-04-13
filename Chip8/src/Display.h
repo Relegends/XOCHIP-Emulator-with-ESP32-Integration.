@@ -8,10 +8,13 @@
 class Display
 {
 public:
-	Display() = default;
+	Display(const std::string& name,
+		const unsigned int windowWidth, const unsigned int windowHeight,
+		const unsigned int displayWidth, const unsigned int displayHeight,
+		const uint32_t mainColor, const uint32_t backgroundColor);
 	~Display() = default;
 
-	bool Init(const std::string& name, const unsigned int width, const unsigned int height, const uint32_t mainColor, const uint32_t backgroundColor);
+	bool Init();
 	void Update();
 	void Close();
 
