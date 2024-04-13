@@ -11,7 +11,10 @@ void Configuration::Init(std::string configPath)
 	arr->for_each([&map](auto&& el)
 		{
 			if constexpr (toml::is_string<decltype(el)>)
-				map[toml::value<char>(el)] = 0;
+			{
+				std::string elem = toml::value<std::string>(el).get();
+				map[elem[0]] = 0;
+			}
 		});
 
 }
