@@ -1,7 +1,8 @@
 #include "Chip8.h"
 #include <iostream>
+#include <chrono>
 
-Chip8::Chip8() : 
+Chip8::Chip8() :
 	m_V({}),
 	m_pc(START_ADDRESS),
 	m_memory({}),
@@ -122,13 +123,29 @@ void Chip8::Simulate_Cycle()
 {
 	uint16_t opcode = Chip8::Fetch();
 	std::function<void()> ExecuteNextInstruction = Chip8::Decode(opcode);
-	
+
 	ExecuteNextInstruction();
 }
 
 void Chip8::Run()
 {
+	std::chrono::high_resolution_clock::time_point start{}, end{};
+	std::chrono::milliseconds deltaTime{ 0 }, timeAcumulator{ 0 };
+	std::chrono::milliseconds threshold{ (int)((1.0 / 60.0) * 1000) };
 
+	while (true)
+	{
+		deltaTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+		start = std::chrono::high_resolution_clock::now();
+		timeAcumulator += deltaTime;
+		while (timeAcumulator >= threshold)
+		{
+			//input
+			Simulate_Cycle();
+			timeAcumulator -= threshold;
+		}
+		end = std::chrono::high_resolution_clock::now();
+	}
 }
 
 void Chip8::Fun_00E0()

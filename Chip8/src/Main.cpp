@@ -20,6 +20,8 @@ int main(int argc, char* argv[])
 	Chip8 emulator;
 
 	emulator.LoadGame(romFile);
+
+	emulator.Run();
 	
 	return 0;
 }

@@ -92,8 +92,8 @@ void Display::DrawPixel(unsigned int x, unsigned int y, bool colored)
 {
 	SDL_Rect pixel;
 
-	unsigned int scaleX = static_cast<unsigned int>(m_windowWidth / 64);
-	unsigned int scaleY = static_cast<unsigned int>(m_windowHeight / 32);
+	unsigned int scaleX = static_cast<unsigned int>(m_windowWidth / m_displayWidth);
+	unsigned int scaleY = static_cast<unsigned int>(m_windowHeight / m_displayHeight);
 
 	pixel.x = x;
 	pixel.y = y;

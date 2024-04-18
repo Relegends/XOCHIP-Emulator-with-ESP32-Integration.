@@ -35,18 +35,31 @@ uint32_t Configuration::GetDisplayBackgroundColor() const
 	return m_config["Display"]["backgroundColor"].value_or<uint32_t>(0x00000000);
 }
 
-const std::unordered_map<char, bool> Configuration::GetInputMap() const
+std::vector<std::pair<char, int>> Configuration::GetInputMap() const
 {
-	auto arr = m_config["Keyboard"].as_table();
-	std::unordered_map<char, bool> map;
-	arr->for_each([&map](auto&& el)
+	auto tbl = m_config["Keyboard"].as_table();
+	std::vector<std::pair<char, int>> vec;
+	tbl->for_each([&vec](auto&& key)
 		{
-			if constexpr (toml::is_string<decltype(el)>)
+			std::pair<char, int> pairValue{};
+
+			toml::array input(key);
+			for (auto&& elem : input)
 			{
-				std::string elem = toml::value<std::string>(el).get();
-				map[elem[0]] = 0;
+				elem.visit([&pairValue](auto&& el) noexcept
+					{
+						if constexpr (toml::is_string<decltype(el)>)
+						{
+							std::string keyName = toml::value<std::string>(el).get();
+							pairValue.first = keyName[0];
+						}
+						else if constexpr (toml::is_number<decltype(el)>)
+							pairValue.second = *el;
+					});
 			}
+
+			vec.push_back(pairValue);
 		});
-	return map;
+	return vec;
 }
 

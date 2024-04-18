@@ -1,6 +1,6 @@
 #pragma once
 #include <toml.hpp>
-#include <unordered_map>
+#include <vector>
 
 class Configuration
 {
@@ -14,7 +14,7 @@ public:
 	uint32_t GetDisplayMainColor() const;
 	uint32_t GetDisplayBackgroundColor() const;
 
-	const std::unordered_map<char, bool> GetInputMap() const;
+	std::vector<std::pair<char, int>> GetInputMap() const;
 
 private:
 	toml::parse_result m_config;
