@@ -4,6 +4,7 @@ Keyboard::Keyboard(const std::vector<std::pair<char, int>>& m_keyboard)
 	: m_keyboard(m_keyboard)
 {
 	m_inputs = {0};
+	m_previousInputs = m_inputs;
 }
 
 void Keyboard::ProcessInput()
@@ -11,17 +12,32 @@ void Keyboard::ProcessInput()
 	SDL_PumpEvents();
 	
 	for (const auto& key : m_keyboard)
-		m_inputs[key.second] = 0;
+	{
+		 SDL_Keycode k = SDL_GetKeyFromName(&key.first);
+		 m_inputs[key.second] = *(SDL_GetKeyboardState(&k));
+	}
 }
 
-void Keyboard::Update(SDL_KeyboardEvent keyboardEvent)
+void Keyboard::SavePreviousInputs()
 {
-	SDL_Keycode keycode = keyboardEvent.keysym.sym;
+	m_previousInputs = m_inputs;
+}
 
-	const char* keyName = SDL_GetKeyName(keycode);
-
-	if (m_keyboard.find(*keyName) != m_keyboard.end())
+bool Keyboard::WaitForInput(int* returnValue)
+{
+	for (int i = 0; i < m_inputs.size(); i++)
 	{
-		m_keyboard[*keyName] = keyboardEvent.state;
+		if (m_inputs[i] != m_previousInputs[i])
+		{
+			m_previousInputs = m_inputs;
+			*returnValue = i;
+			return true;
+		}
 	}
+	return false;
+}
+
+int Keyboard::ReadKeyboard(const unsigned int position)
+{
+	return m_inputs[position];
 }

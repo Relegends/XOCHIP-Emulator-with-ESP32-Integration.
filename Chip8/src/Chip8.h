@@ -23,6 +23,8 @@ public:
 
 private:
 
+	void LoadFontSet();
+
 	uint16_t Fetch();
 	std::function<void()> Decode(uint16_t opcode);
 
@@ -74,8 +76,6 @@ private:
 
 	uint8_t m_delayTimer;
 	uint8_t m_soundTimer;
-
-	const uint16_t START_ADDRESS = 0x200;
 
 	Configuration m_config;	
 	Display m_display;

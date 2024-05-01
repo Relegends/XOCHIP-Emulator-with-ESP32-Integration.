@@ -11,9 +11,15 @@ public:
 	~Keyboard() = default;
 
 	void ProcessInput();
-	void Update(SDL_KeyboardEvent keyboardEvent);
+
+	void SavePreviousInputs();
+
+	bool WaitForInput(int* returnValue);
+
+	int ReadKeyboard(const unsigned int position);
 
 private:
 	std::vector<std::pair<char, int>> m_keyboard;
 	std::array<int, 16> m_inputs;
+	std::array<int, 16> m_previousInputs;
 };
