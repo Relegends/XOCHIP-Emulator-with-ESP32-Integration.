@@ -12,7 +12,6 @@ public:
 		const unsigned int windowWidth, const unsigned int windowHeight,
 		const unsigned int displayWidth, const unsigned int displayHeight,
 		const uint32_t mainColor, const uint32_t backgroundColor);
-	~Display() = default;
 
 	bool Init();
 	void Update();
@@ -23,6 +22,8 @@ public:
 	void Render();
 
 	bool ChangePixelValue(unsigned int x, unsigned int y, const bool value); // Returns wheter there was a collision or not
+
+	bool IsWindowClose();
 
 private:
 

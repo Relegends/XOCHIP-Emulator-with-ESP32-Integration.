@@ -1,4 +1,4 @@
-#include <string.h>
+#include <string>
 #include <iostream>
 #include <memory>
 #include <SDL.h>
@@ -8,14 +8,14 @@
 
 int main(int argc, char* argv[])
 {
-	/*if (argc != 2) {
-		std::cerr << "Usage: " << argv[0] << " <ROM>" << std::endl;
+	if (argc != 2) {
+		std::cerr << "Usage: " << argv[0] << " <ROM-PATH>" << std::endl;
 		std::exit(EXIT_FAILURE);
 	}
 
-	const std::string romFile = argv[1];*/
+	std::string romFile = argv[1];
 
-	const std::string romFile = "./testRom.ch8";
+	//const std::string romFile = "./testRoms/2-ibm-logo.ch8";
 
 	Chip8 emulator;
 
@@ -23,5 +23,7 @@ int main(int argc, char* argv[])
 
 	emulator.Run();
 	
+	std::cout << "Bye Bye!" << std::endl;
+
 	return 0;
 }

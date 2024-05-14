@@ -1,20 +1,21 @@
 #include "Keyboard.h"
 
-Keyboard::Keyboard(const std::vector<std::pair<char, int>>& m_keyboard)
+Keyboard::Keyboard(const std::vector<std::pair<std::string, int>>& m_keyboard)
 	: m_keyboard(m_keyboard)
 {
 	m_inputs = {0};
 	m_previousInputs = m_inputs;
+	keyPressed = -1;
 }
 
 void Keyboard::ProcessInput()
 {
 	SDL_PumpEvents();
-	
+	const uint8_t* keyBoardState = SDL_GetKeyboardState(NULL);
+
 	for (const auto& key : m_keyboard)
-	{
-		 SDL_Keycode k = SDL_GetKeyFromName(&key.first);
-		 m_inputs[key.second] = *(SDL_GetKeyboardState(&k));
+	{	 
+		 m_inputs[key.second] = keyBoardState[SDL_GetScancodeFromName(key.first.c_str())];
 	}
 }
 
@@ -25,12 +26,26 @@ void Keyboard::SavePreviousInputs()
 
 bool Keyboard::WaitForInput(int* returnValue)
 {
-	for (int i = 0; i < m_inputs.size(); i++)
+	if (keyPressed == -1)
 	{
-		if (m_inputs[i] != m_previousInputs[i])
+		for (int i = 0; i < m_inputs.size(); i++)
 		{
-			m_previousInputs = m_inputs;
-			*returnValue = i;
+			if (m_inputs[i] != m_previousInputs[i])
+			{
+				m_previousInputs = m_inputs;
+				keyPressed = i;
+				return false;
+			}
+		}
+	}
+	else
+	{
+		if (m_inputs[keyPressed])
+			return false;
+		else
+		{
+			*returnValue = keyPressed;
+			keyPressed = -1;
 			return true;
 		}
 	}

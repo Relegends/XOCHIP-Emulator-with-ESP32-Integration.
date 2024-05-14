@@ -13,6 +13,9 @@ Display::Display(const std::string& name,
 	m_displayHeight = displayHeight;
 	m_mainColor = mainColor;
 	m_backgroundColor = backgroundColor;
+
+	m_closeWindow = false;
+	m_display.resize(displayHeight * displayWidth);
 }
 
 bool Display::Init()
@@ -41,7 +44,7 @@ bool Display::Init()
 				SDL_DestroyRenderer
 			);
 
-			if (m_renderer = nullptr)
+			if (m_renderer == nullptr)
 			{
 				std::cout << "Renderer could not be created! SDL_Error: " << SDL_GetError() << std::endl;
 				return false;
@@ -58,20 +61,20 @@ bool Display::Init()
 void Display::Update()
 {
 	SDL_Event e;
+	SDL_PollEvent(&e);
+	if (e.type == SDL_QUIT)
+		m_closeWindow = true;
 
-	while (!m_closeWindow)
+	if (!m_closeWindow)
 	{
-		while (SDL_PollEvent(&e) != 0)
-		{
-			if (e.type == SDL_QUIT)
-				m_closeWindow = true;
-		}
-
-		//Update the surface
-		SDL_UpdateWindowSurface(m_window.get());
+		SDL_RenderClear(m_renderer.get());
+		Render();
+		SDL_RenderPresent(m_renderer.get());
 	}
-
-	Close();
+	else
+	{
+		Close();
+	}
 }
 
 void Display::Close()
@@ -95,8 +98,8 @@ void Display::DrawPixel(unsigned int x, unsigned int y, bool colored)
 	unsigned int scaleX = static_cast<unsigned int>(m_windowWidth / m_displayWidth);
 	unsigned int scaleY = static_cast<unsigned int>(m_windowHeight / m_displayHeight);
 
-	pixel.x = x;
-	pixel.y = y;
+	pixel.x = x * scaleX ;
+	pixel.y = y * scaleY;
 	pixel.w = scaleX;
 	pixel.h = scaleY;
 
@@ -110,6 +113,8 @@ void Display::DrawPixel(unsigned int x, unsigned int y, bool colored)
 			m_backgroundColor & 0xFF);
 
 	SDL_RenderFillRect(m_renderer.get(), &pixel);
+	//SDL_RenderPresent(m_renderer.get());
+
 }
 
 void Display::Render()
@@ -118,7 +123,7 @@ void Display::Render()
 	{
 		for (uint8_t col = 0; col < m_displayWidth; col++)
 		{
-			Display::DrawPixel(row, col, m_display[m_displayWidth * row + col]);
+			Display::DrawPixel(col, row, m_display[m_displayWidth * row + col]); //BE AWARE --> COL = X; ROW = Y!!!!!!!!
 		}
 	}
 }
@@ -136,4 +141,9 @@ bool Display::ChangePixelValue(unsigned int x, unsigned int y, const bool value)
 	m_display[offset] = (m_display[offset] ^ value); // Paint sprite with XOR
 
 	return conflict;
+}
+
+bool Display::IsWindowClose() 
+{
+	return m_closeWindow;
 }

@@ -35,13 +35,13 @@ uint32_t Configuration::GetDisplayBackgroundColor() const
 	return m_config["Display"]["backgroundColor"].value_or<uint32_t>(0x00000000);
 }
 
-std::vector<std::pair<char, int>> Configuration::GetInputMap() const
+std::vector<std::pair<std::string, int>> Configuration::GetInputMap() const
 {
 	auto tbl = m_config["Keyboard"].as_table();
-	std::vector<std::pair<char, int>> vec;
+	std::vector<std::pair<std::string, int>> vec;
 	tbl->for_each([&vec](auto&& key)
 		{
-			std::pair<char, int> pairValue{};
+			std::pair<std::string, int> pairValue{};
 
 			toml::array input(key);
 			for (auto&& elem : input)
@@ -51,7 +51,7 @@ std::vector<std::pair<char, int>> Configuration::GetInputMap() const
 						if constexpr (toml::is_string<decltype(el)>)
 						{
 							std::string keyName = toml::value<std::string>(el).get();
-							pairValue.first = keyName[0];
+							pairValue.first = keyName;
 						}
 						else if constexpr (toml::is_number<decltype(el)>)
 							pairValue.second = *el;
