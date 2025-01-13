@@ -1,21 +1,27 @@
 #include "Chip8.h"
 #include <iostream>
 #include <chrono>
+#include <thread>
 
 Chip8::Chip8() :
-	m_V({0}),
+	m_V({ 0 }),
 	m_pc(0x200), // Start Address
-	m_memory({0}),
-	m_stack({0}),
+	m_memory({ 0 }),
+	m_stack({ 0 }),
 	m_sp(m_stack.begin()),
 	m_config("./Config/Config.toml"),
 	m_display("Chip 8", m_config.GetWindowWidth(), m_config.GetWindowHeight(), m_config.GetDisplayWidth(), m_config.GetDisplayHeight(),
 		m_config.GetDisplayMainColor(), m_config.GetDisplayBackgroundColor()),
 	m_keyboard({ m_config.GetInputMap() }),
-	m_decoder({0})
+	m_decoder({ 0 }),
+	m_interpreter((Chip8::INTERPRETER)m_config.GetInterpretedMode()),
+	m_instructionCount(0),
+	m_ips(m_config.GetIPS())
 {
 	if (!m_display.Init()) exit(-1);
 	std::srand(static_cast<unsigned int>(std::time(0)));
+
+	InitQuirks();
 
 	LoadFontSet();
 }
@@ -41,6 +47,60 @@ void Chip8::LoadFontSet()
 		0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
 		0xF0, 0x80, 0xF0, 0x80, 0x80 // F
 	};
+}
+
+void Chip8::InitQuirks()
+{
+	switch (m_interpreter)
+	{
+	case Chip8::VIP:
+		m_VFreset_quirk		= true;
+		m_Memory_quirk		= true;
+		m_DisplayWait_quirk	= true;
+		m_Clipping_quirk	= true;
+		m_Shifting_quirk	= false;
+		m_Jumping_quirk		= false;
+		break;
+	case Chip8::SCHIP:
+		m_VFreset_quirk		= false;
+		m_Memory_quirk		= false;
+		m_DisplayWait_quirk = false;
+		m_Clipping_quirk	= true;
+		m_Shifting_quirk	= true;
+		m_Jumping_quirk		= true;
+		break;
+	case Chip8::OCTO:
+		m_VFreset_quirk		= false;
+		m_Memory_quirk		= true;
+		m_DisplayWait_quirk = false;
+		m_Clipping_quirk	= false;
+		m_Shifting_quirk	= false;
+		m_Jumping_quirk		= false;
+		break;
+	case Chip8::XOCHIP:
+		m_VFreset_quirk		= false;
+		m_Memory_quirk		= true;
+		m_DisplayWait_quirk = false;
+		m_Clipping_quirk	= false;
+		m_Shifting_quirk	= false;
+		m_Jumping_quirk		= false;
+		break;
+	default:
+		break;
+	}
+
+	UpdateQuirk(m_VFreset_quirk, m_config.GetVFresetQuirk());
+	UpdateQuirk(m_Memory_quirk, m_config.GetMemoryQuirk());
+	UpdateQuirk(m_DisplayWait_quirk, m_config.GetDisplayWaitQuirk());
+	UpdateQuirk(m_Clipping_quirk, m_config.GetClippingQuirk());
+	UpdateQuirk(m_Shifting_quirk, m_config.GetShiftingQuirk());
+	UpdateQuirk(m_Jumping_quirk, m_config.GetJumpingQuirk());
+}
+
+void Chip8::UpdateQuirk(bool& quirkMember, const int configValue)
+{
+	if (configValue != -1)
+		quirkMember = configValue;
 }
 
 uint16_t Chip8::Fetch()
@@ -200,29 +260,35 @@ void Chip8::Simulate_Cycle()
 void Chip8::Run()
 {
 	std::chrono::high_resolution_clock::time_point start{}, end{};
-	std::chrono::microseconds deltaTime{ 0 }, timeAcumulator{ 0 };
-	std::chrono::microseconds threshold{ (int)((1.0 / 60.0) * 1000) };
+	std::chrono::microseconds elapsedTime{ 0 };
+	std::chrono::microseconds thresholdCPU{ 16667 }; // 16.67 ms
 
 	while (!m_display.IsWindowClose())
 	{
-		deltaTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+		m_keyboard.ProcessInput();
+
 		start = std::chrono::high_resolution_clock::now();
-		timeAcumulator += deltaTime;
-		//std::cout << "Delta time: " << deltaTime.count() << "ms, Time Acumulator: " << timeAcumulator.count() << "ms" << std::endl;
-		while (timeAcumulator >= threshold)
+
+		while (m_instructionCount < m_ips)
 		{
-			m_keyboard.ProcessInput();
 			Simulate_Cycle();
-			m_keyboard.SavePreviousInputs();
-			m_display.Update();
-			timeAcumulator -= threshold;
-			if (m_delayTimer > 0)
-				m_delayTimer--;
-			/*if (m_soundTimer > 0)
-			{
-			}*/
+			m_instructionCount++;
 		}
+		m_instructionCount = 0;
+
 		end = std::chrono::high_resolution_clock::now();
+
+		elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+		std::this_thread::sleep_for(thresholdCPU > elapsedTime ? (thresholdCPU - elapsedTime) : std::chrono::milliseconds(0));
+
+		if (m_delayTimer > 0)
+			m_delayTimer--;
+
+		m_keyboard.SavePreviousInputs();
+
+		m_display.Update();
+
 	}
 }
 
@@ -358,11 +424,16 @@ Set Vx = Vx OR Vy.
 Performs a bitwise OR on the values of Vx and Vy, then stores the result in Vx.
 A bitwise OR compares the corrseponding bits from two values, and if either bit is 1, then the same bit in the result is also 1.
 Otherwise, it is 0.
+
+It also resets the flag register to zero IF VF reset quirk is on.
 */
 void Chip8::Fun_8xy1()
 {
 	printf("OR V%X, V%X\n", m_decoder.x, m_decoder.y);
 	m_V[m_decoder.x] |= m_V[m_decoder.y];
+
+	if (m_VFreset_quirk)
+		m_V[0xF] = 0;
 }
 
 /*
@@ -372,11 +443,16 @@ Set Vx = Vx AND Vy.
 Performs a bitwise AND on the values of Vx and Vy, then stores the result in Vx.
 A bitwise AND compares the corrseponding bits from two values, and if both bits are 1, then the same bit in the result is also 1.
 Otherwise, it is 0.
+
+It also resets the flag register to zero IF VF reset quirk is on.
 */
 void Chip8::Fun_8xy2()
 {
 	printf("AND V%X, V%X\n", m_decoder.x, m_decoder.y);
 	m_V[m_decoder.x] &= m_V[m_decoder.y];
+
+	if (m_VFreset_quirk)
+		m_V[0xF] = 0;
 }
 
 /*
@@ -386,11 +462,16 @@ Set Vx = Vx XOR Vy.
 Performs a bitwise exclusive OR on the values of Vx and Vy, then stores the result in Vx.
 An exclusive OR compares the corrseponding bits from two values, and if the bits are not both the same, then the corresponding bit in the result is set to 1.
 Otherwise, it is 0.
+
+It also resets the flag register to zero IF VF reset quirk is on.
 */
 void Chip8::Fun_8xy3()
 {
 	printf("XOR V%X, V%X\n", m_decoder.x, m_decoder.y);
 	m_V[m_decoder.x] ^= m_V[m_decoder.y];
+
+	if (m_VFreset_quirk)
+		m_V[0xF] = 0;
 }
 
 /*
@@ -427,14 +508,29 @@ void Chip8::Fun_8xy5()
 }
 
 /*
-8xy6 - SHR Vx {, Vy}
-Set Vx = Vx SHR 1.
+WITHOUT SHIFING QUIRK INTERPRETATION:
+	8xy6 - SHR Vx, Vy
+	Set the value of Vy to Vx and then set Vx = Vx SHR 1.
 
-If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0. Then Vx is divided by 2.
+	If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0. Then Vx is divided by 2.
+
+SHIFTING QUIRK INTERPRETATION:
+	8xy6 - SHR Vx
+	Set Vx = Vx SHR 1.
+
+	If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0. Then Vx is divided by 2.
 */
 void Chip8::Fun_8xy6()
 {
-	printf("SHR V%X\n", m_decoder.x);
+	if (!m_Shifting_quirk)
+	{
+		printf("SHR V%X, V%X\n", m_decoder.x, m_decoder.y);
+
+		m_V[m_decoder.x] = m_V[m_decoder.y];
+	}
+	else
+		printf("SHR V%X\n", m_decoder.x);
+
 	uint8_t flag = ((m_V[m_decoder.x] & 0x01) == 1);
 	m_V[m_decoder.x] /= 2;
 	m_V[0xF] = flag;
@@ -457,18 +553,34 @@ void Chip8::Fun_8xy7()
 }
 
 /*
-8xyE - SHL Vx {, Vy}
-Set Vx = Vx SHL 1.
+WITHOUT SHIFING QUIRK INTERPRETATION:
+	8xyE - SHL Vx, Vy
+	Set the value of Vy to Vx and then set Vx = Vx SHL 1.
 
-If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0. Then Vx is multiplied by 2.
+	If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0. Then Vx is multiplied by 2.
+
+SHIFTING QUIRK INTERPRETATION:
+	8xyE - SHL Vx
+	Set Vx = Vx SHL 1.
+
+	If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0. Then Vx is multiplied by 2.
 */
 void Chip8::Fun_8xyE()
 {
-	printf("SHL V%X\n", m_decoder.x);
+
+	if (!m_Shifting_quirk)
+	{
+		printf("SHL V%X, V%X\n", m_decoder.x, m_decoder.y);
+
+		m_V[m_decoder.x] = m_V[m_decoder.y];
+	}
+	else
+		printf("SHL V%X\n", m_decoder.x);
 
 	uint8_t flag = ((m_V[m_decoder.x] >> 7) == 1);
 	m_V[m_decoder.x] *= 2;
 	m_V[0xF] = flag;
+
 }
 
 /*
@@ -500,16 +612,32 @@ void Chip8::Fun_Annn()
 }
 
 /*
-Bnnn - JP V0, addr
-Jump to location nnn + V0.
+WITHOUT JUMPING QUIRK INTERPRETATION:
+	Bnnn - JP V0, addr
+	Jump to location nnn + V0.
 
-The program counter is set to nnn plus the value of V0.
+	The program counter is set to nnn plus the value of V0.
+
+JUMPING QUIRK INTERPRETATION:
+	Bxnn - JP Vx, addr
+	Jump to location nnn + Vx.
+
+	The program counter is set to nnn plus the value of Vx.
 */
 void Chip8::Fun_Bnnn()
 {
-	printf("JP V0, 0x%X\n", m_decoder.nnn);
+	if (!m_Jumping_quirk)
+	{
+		printf("JP V0, 0x%X\n", m_decoder.nnn);
 
-	m_pc = m_decoder.nnn + m_V[0];
+		m_pc = m_decoder.nnn + m_V[0];
+	}
+	else
+	{
+		printf("JP V%X, 0x%X\n", m_decoder.x, m_decoder.nnn);
+
+		m_pc = m_decoder.nnn + m_V[m_decoder.x];
+	}
 }
 
 /*
@@ -553,11 +681,14 @@ void Chip8::Fun_Dxyn()
 		for (int col = 0; col < 8; col++)
 		{
 			bool pixel = spriteRow & (0x80 >> col);
-			bool conflict = m_display.ChangePixelValue(xPos + col, yPos + row, pixel);
+			bool conflict = m_display.ChangePixelValue(xPos, yPos, col, row, pixel, m_Clipping_quirk);
 			if (conflict)
 				m_V[0xF] = 1;
 		}
 	}
+
+	if (m_DisplayWait_quirk)
+		m_instructionCount = m_ips;
 }
 
 /*
@@ -693,29 +824,71 @@ void Chip8::Fun_Fx33()
 }
 
 /*
-Fx55 - LD [I], Vx
-Store registers V0 through Vx in memory starting at location I.
+MEMORY QUIRK INTERPRETATION:
+	Fx55 - LD [I], Vx
+	Store registers V0 through Vx in memory starting at location I.
 
-The interpreter copies the values of registers V0 through Vx into memory, starting at the address in I.
+	The interpreter copies the values of registers V0 through Vx into memory, starting at the address in I.
+
+	The index register (I) is incremented.
+
+WITHOUT MEMORY QUIRK INTERPRETATION:
+	Fx55 - LD [I], Vx
+	Store registers V0 through Vx in memory starting at location I.
+
+	The interpreter copies the values of registers V0 through Vx into memory, starting at the address in I.
+
+	The index register (I) is NOT incremented.
 */
 void Chip8::Fun_Fx55()
 {
-	printf("LD [I], V%X\n", m_decoder.x);
+	if (m_Memory_quirk)
+	{
+		printf("LD [I], V%X\n", m_decoder.x);
 
-	for (uint8_t i = 0; i <= m_decoder.x; i++)
-		m_memory[m_indexRegister + i] = m_V[i];
+		for (uint8_t i = 0; i <= m_decoder.x; i++)
+			m_memory[m_indexRegister++] = m_V[i];
+	}
+	else
+	{
+		printf("LD [I], V%X\n", m_decoder.x);
+
+		for (uint8_t i = 0; i <= m_decoder.x; i++)
+			m_memory[m_indexRegister + i] = m_V[i];
+	}
 }
 
 /*
-Fx65 - LD Vx, [I]
-Read registers V0 through Vx from memory starting at location I.
+MEMORY QUIRK INTERPRETATION:
+	Fx65 - LD Vx, [I]
+	Read registers V0 through Vx from memory starting at location I.
 
-The interpreter reads values from memory starting at location I into registers V0 through Vx.
+	The interpreter reads values from memory starting at location I into registers V0 through Vx.
+
+	The index register (I) is incremented.
+
+WITHOUT MEMORY QUIRK INTERPRETATION:
+	Fx65 - LD Vx, [I]
+	Read registers V0 through Vx from memory starting at location I.
+
+	The interpreter reads values from memory starting at location I into registers V0 through Vx.
+
+	The index register (I) is NOT incremented.
 */
 void Chip8::Fun_Fx65()
 {
-	printf("LD V%X, [I]\n", m_decoder.x);
+	if (m_Memory_quirk)
+	{
+		printf("LD V%X, [I]\n", m_decoder.x);
 
-	for (uint8_t i = 0; i <= m_decoder.x; i++)
-		m_V[i] = m_memory[m_indexRegister + i];
+		for (uint8_t i = 0; i <= m_decoder.x; i++)
+			m_V[i] = m_memory[m_indexRegister++];
+	}
+	else
+	{
+		printf("LD V%X, [I]\n", m_decoder.x);
+
+		for (uint8_t i = 0; i <= m_decoder.x; i++)
+			m_V[i] = m_memory[m_indexRegister + i];
+	}
 }

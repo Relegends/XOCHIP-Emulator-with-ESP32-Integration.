@@ -25,6 +25,9 @@ private:
 
 	void LoadFontSet();
 
+	void InitQuirks();
+	void UpdateQuirk(bool& quirkMember, const int configValue);
+
 	uint16_t Fetch();
 	std::function<void()> Decode(uint16_t opcode);
 
@@ -90,5 +93,23 @@ private:
 		uint8_t y;		//A 4-bit value, the upper 4 bits of the low byte of the instruction
 		uint8_t kk;		//An 8-bit value, the lowest 8 bits of the instruction
 	} m_decoder;
+
+	enum INTERPRETER
+	{
+		VIP = 0,
+		SCHIP,
+		OCTO,
+		XOCHIP
+	} m_interpreter;
+
+	bool m_VFreset_quirk;
+	bool m_Memory_quirk;
+	bool m_DisplayWait_quirk;
+	bool m_Clipping_quirk;
+	bool m_Shifting_quirk;
+	bool m_Jumping_quirk;
+
+	unsigned int m_ips;
+	unsigned int m_instructionCount;
 };
 

@@ -21,7 +21,7 @@ public:
 
 	void Render();
 
-	bool ChangePixelValue(unsigned int x, unsigned int y, const bool value); // Returns wheter there was a collision or not
+	bool ChangePixelValue(unsigned int x, unsigned int y, unsigned int col, unsigned int row, const bool value, const bool clipping); // Returns wheter there was a collision or not
 
 	bool IsWindowClose();
 

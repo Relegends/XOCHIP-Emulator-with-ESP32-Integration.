@@ -5,6 +5,86 @@ Configuration::Configuration(std::string configPath)
 	m_config = toml::parse_file(configPath);
 }
 
+unsigned int Configuration::GetInterpretedMode() const
+{
+	unsigned int value = m_config["InterpreterMode"]["interpreter"].value_or(0);
+
+	if (value < 0 || value > 3)
+		value = 2;
+
+	return value;
+}
+
+int Configuration::GetVFresetQuirk() const
+{
+	int value = m_config["Quirks"]["VFreset"].value_or(-1);
+
+	if (value < -1 || value > 1)
+		value = -1;
+
+	return value;
+}
+
+int Configuration::GetMemoryQuirk() const
+{
+	int value = m_config["Quirks"]["Memory"].value_or(-1);
+
+	if (value < -1 || value > 1)
+		value = -1;
+
+	return value;
+}
+
+int Configuration::GetDisplayWaitQuirk() const
+{
+	int value = m_config["Quirks"]["DisplayWait"].value_or(-1);
+
+	if (value < -1 || value > 1)
+		value = -1;
+
+	return value;
+}
+
+int Configuration::GetClippingQuirk() const
+{
+	int value = m_config["Quirks"]["Clipping"].value_or(-1);
+
+	if (value < -1 || value > 1)
+		value = -1;
+
+	return value;
+}
+
+int Configuration::GetShiftingQuirk() const
+{
+	int value = m_config["Quirks"]["Shifting"].value_or(-1);
+
+	if (value < -1 || value > 1)
+		value = -1;
+
+	return value;
+}
+
+int Configuration::GetJumpingQuirk() const
+{
+	int value = m_config["Quirks"]["Jumping"].value_or(-1);
+
+	if (value < -1 || value > 1)
+		value = -1;
+
+	return value;
+}
+
+int Configuration::GetIPS() const
+{
+	int value = m_config["IPS"]["IPS"].value_or(10);
+
+	if (value < 7)
+		value = 7;
+
+	return value;
+}
+
 unsigned int Configuration::GetWindowWidth() const
 {
 	return m_config["Display"]["windowResolution"][0].value_or(1920);

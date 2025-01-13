@@ -43,7 +43,6 @@ bool Display::Init()
 				SDL_CreateRenderer(m_window.get(), NULL, SDL_RENDERER_ACCELERATED),
 				SDL_DestroyRenderer
 			);
-
 			if (m_renderer == nullptr)
 			{
 				std::cout << "Renderer could not be created! SDL_Error: " << SDL_GetError() << std::endl;
@@ -128,13 +127,33 @@ void Display::Render()
 	}
 }
 
-bool Display::ChangePixelValue(unsigned int x, unsigned int y, const bool value)
+bool Display::ChangePixelValue(unsigned int x, unsigned int y, unsigned int col, unsigned int row, const bool value, const bool clipping)
 {
-	// Wrapping screen
-	x %= m_displayWidth;
-	y %= m_displayHeight;
+	unsigned int posX, posY;
 
-	int offset = m_displayWidth * y + x;
+	posX = x + col;
+	posY = y + row;
+
+	if (!clipping)
+	{
+		// Wrapping screen
+		posX %= m_displayWidth;
+		posY %= m_displayHeight;
+	}
+	else
+	{
+		if (x >= m_displayWidth)
+			posX %= m_displayWidth;
+		else if (posX >= m_displayWidth) // Clipping
+			return false;
+			
+		if (y >= m_displayHeight)
+			posY %= m_displayHeight;
+		else if (posY >= m_displayHeight) // Clipping
+			return false;
+	}
+
+	int offset = m_displayWidth * posY + posX;
 
 	bool conflict = (m_display[offset]); // If the pixel was alredy on --> CONFLICT
 

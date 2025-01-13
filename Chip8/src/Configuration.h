@@ -7,6 +7,14 @@ class Configuration
 public:
 	Configuration(std::string configPath);
 
+	unsigned int GetInterpretedMode() const;
+	int GetVFresetQuirk() const;
+	int GetMemoryQuirk() const;
+	int GetDisplayWaitQuirk() const;
+	int GetClippingQuirk() const;
+	int GetShiftingQuirk() const;
+	int GetJumpingQuirk() const;
+	int GetIPS() const;
 	unsigned int GetWindowWidth() const;
 	unsigned int GetWindowHeight() const;
 	unsigned int GetDisplayWidth() const;

@@ -1,3 +1,6 @@
+[Mode]
+interpreterMode = 0
+
 [Display]
 windowResolution = [1920, 1080]
 displayResolution = [64, 32]

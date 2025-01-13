@@ -1,10 +1,7 @@
 #include <string>
 #include <iostream>
-#include <memory>
-#include <SDL.h>
 
 #include "Chip8.h"
-#include "Display.h"
 
 int main(int argc, char* argv[])
 {
