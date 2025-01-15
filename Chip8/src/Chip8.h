@@ -33,6 +33,8 @@ private:
 
 	void Fun_00E0(); // CLS
 	void Fun_00EE(); // RET
+	void Fun_00FE(); // Disable extended screen mode
+	void Fun_00FF(); // Enable extended screen mode
 	void Fun_1nnn(); // JP addr
 	void Fun_2nnn(); // CALL addr
 	void Fun_3xkk(); // SE Vx, byte
@@ -62,6 +64,7 @@ private:
 	void Fun_Fx18(); // LD ST, Vx
 	void Fun_Fx1E(); // ADD I, Vx
 	void Fun_Fx29(); // LD F, Vx
+	void Fun_Fx30(); // LD F, Vx
 	void Fun_Fx33(); // LD B, Vx
 	void Fun_Fx55(); // LD [I], Vx
 	void Fun_Fx65(); // LD Vx, [I]
@@ -108,6 +111,8 @@ private:
 	bool m_Clipping_quirk;
 	bool m_Shifting_quirk;
 	bool m_Jumping_quirk;
+
+	bool m_extendedMode;
 
 	unsigned int m_ips;
 	unsigned int m_instructionCount;

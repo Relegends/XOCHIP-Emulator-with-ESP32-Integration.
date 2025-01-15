@@ -127,6 +127,23 @@ void Display::Render()
 	}
 }
 
+void Display::SetExtendedMode(const bool enable)
+{
+	if (enable)
+	{
+		m_displayWidth = 128;
+		m_displayHeight = 64;
+	}
+	else
+	{
+		m_displayWidth = 64;
+		m_displayHeight = 32;
+	}
+
+	CLS();
+	m_display.resize(m_displayWidth * m_displayHeight, 0);
+}
+
 bool Display::ChangePixelValue(unsigned int x, unsigned int y, unsigned int col, unsigned int row, const bool value, const bool clipping)
 {
 	unsigned int posX, posY;

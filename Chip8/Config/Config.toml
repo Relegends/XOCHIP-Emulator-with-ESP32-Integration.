@@ -1,11 +1,24 @@
-[Mode]
-interpreterMode = 0
+# Interpreter: VIP = 0 * SCHIP = 1 * OCTO = 2 * XOChip = 3
+[InterpreterMode]
+interpreter = 2
+
+#Quirks Values: -1 = Default by Interpreter, 0 = OFF, 1 = 0N 
+[Quirks]
+VFreset = -1
+Memory = -1
+DisplayWait = -1
+Clipping = -1
+Shifting = -1
+Jumping = -1
+
+[IPS]
+IPS = 20
 
 [Display]
-windowResolution = [1920, 1080]
+windowResolution = [640, 320]
 displayResolution = [64, 32]
-mainColor = 0xFFFFFFFF
-backgroundColor = 0x9e3636FF
+mainColor = 0xffcc00ff
+backgroundColor = 0x996600ff
 
 [Keyboard]
 1 = ["1", 1	]

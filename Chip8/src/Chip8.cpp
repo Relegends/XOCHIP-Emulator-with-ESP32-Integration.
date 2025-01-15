@@ -28,25 +28,102 @@ Chip8::Chip8() :
 
 void Chip8::LoadFontSet()
 {
-	m_memory =
+	switch (m_interpreter)
 	{
-		0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
-		0x20, 0x60, 0x20, 0x20, 0x70, // 1
-		0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
-		0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
-		0x90, 0x90, 0xF0, 0x10, 0x10, // 4
-		0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
-		0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
-		0xF0, 0x10, 0x20, 0x40, 0x40, // 7
-		0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
-		0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
-		0xF0, 0x90, 0xF0, 0x90, 0x90, // A
-		0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
-		0xF0, 0x80, 0x80, 0x80, 0xF0, // C
-		0xE0, 0x90, 0x90, 0x90, 0xE0, // D
-		0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-		0xF0, 0x80, 0xF0, 0x80, 0x80 // F
-	};
+	case Chip8::VIP:
+		m_memory =
+		{
+			0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+			0x20, 0x60, 0x20, 0x20, 0x70, // 1
+			0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+			0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+			0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+			0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+			0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+			0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+			0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+			0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+			0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+			0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+			0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+			0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+			0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+			0xF0, 0x80, 0xF0, 0x80, 0x80 // F
+		};
+		break;
+	case Chip8::SCHIP:
+		m_memory =
+		{
+			0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+			0x20, 0x60, 0x20, 0x20, 0x70, // 1
+			0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+			0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+			0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+			0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+			0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+			0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+			0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+			0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+			0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+			0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+			0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+			0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+			0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+			0xF0, 0x80, 0xF0, 0x80, 0x80, // F
+
+			//High res font
+			0x3C, 0x7E, 0xE7, 0xC3, 0xC3, 0xC3, 0xC3, 0xE7, 0x7E, 0x3C, // 0
+			0x18, 0x38, 0x58, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3C, // 1
+			0x3E, 0x7F, 0xC3, 0x06, 0x0C, 0x18, 0x30, 0x60, 0xFF, 0xFF, // 2
+			0x3C, 0x7E, 0xC3, 0x03, 0x0E, 0x0E, 0x03, 0xC3, 0x7E, 0x3C, // 3
+			0x06, 0x0E, 0x1E, 0x36, 0x66, 0xC6, 0xFF, 0xFF, 0x06, 0x06, // 4
+			0xFF, 0xFF, 0xC0, 0xC0, 0xFC, 0xFE, 0x03, 0xC3, 0x7E, 0x3C, // 5
+			0x3E, 0x7C, 0xC0, 0xC0, 0xFC, 0xFE, 0xC3, 0xC3, 0x7E, 0x3C, // 6
+			0xFF, 0xFF, 0x03, 0x06, 0x0C, 0x18, 0x30, 0x60, 0x60, 0x60, // 7
+			0x3C, 0x7E, 0xC3, 0xC3, 0x7E, 0x7E, 0xC3, 0xC3, 0x7E, 0x3C, // 8
+			0x3C, 0x7E, 0xC3, 0xC3, 0x7F, 0x3F, 0x03, 0x03, 0x3E, 0x7C  // 9
+		};
+		break;
+	case Chip8::OCTO:
+		m_memory =
+		{
+			0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+			0x20, 0x60, 0x20, 0x20, 0x70, // 1
+			0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+			0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+			0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+			0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+			0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+			0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+			0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+			0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+			0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+			0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+			0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+			0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+			0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+			0xF0, 0x80, 0xF0, 0x80, 0x80, // F
+
+			//High res font
+			0x3C, 0x7E, 0xE7, 0xC3, 0xC3, 0xC3, 0xC3, 0xE7, 0x7E, 0x3C, // 0
+			0x18, 0x38, 0x58, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3C, // 1
+			0x3E, 0x7F, 0xC3, 0x06, 0x0C, 0x18, 0x30, 0x60, 0xFF, 0xFF, // 2
+			0x3C, 0x7E, 0xC3, 0x03, 0x0E, 0x0E, 0x03, 0xC3, 0x7E, 0x3C, // 3
+			0x06, 0x0E, 0x1E, 0x36, 0x66, 0xC6, 0xFF, 0xFF, 0x06, 0x06, // 4
+			0xFF, 0xFF, 0xC0, 0xC0, 0xFC, 0xFE, 0x03, 0xC3, 0x7E, 0x3C, // 5
+			0x3E, 0x7C, 0xC0, 0xC0, 0xFC, 0xFE, 0xC3, 0xC3, 0x7E, 0x3C, // 6
+			0xFF, 0xFF, 0x03, 0x06, 0x0C, 0x18, 0x30, 0x60, 0x60, 0x60, // 7
+			0x3C, 0x7E, 0xC3, 0xC3, 0x7E, 0x7E, 0xC3, 0xC3, 0x7E, 0x3C, // 8
+			0x3C, 0x7E, 0xC3, 0xC3, 0x7F, 0x3F, 0x03, 0x03, 0x3E, 0x7C  // 9
+		};
+		break;
+	case Chip8::XOCHIP:
+		break;
+	default:
+		std::cout << "NOT VALID INTERPRETER!!!" << std::endl;
+		exit(-1);
+		break;
+	}
 }
 
 void Chip8::InitQuirks()
@@ -54,36 +131,36 @@ void Chip8::InitQuirks()
 	switch (m_interpreter)
 	{
 	case Chip8::VIP:
-		m_VFreset_quirk		= true;
-		m_Memory_quirk		= true;
-		m_DisplayWait_quirk	= true;
-		m_Clipping_quirk	= true;
-		m_Shifting_quirk	= false;
-		m_Jumping_quirk		= false;
+		m_VFreset_quirk = true;
+		m_Memory_quirk = true;
+		m_DisplayWait_quirk = true;
+		m_Clipping_quirk = true;
+		m_Shifting_quirk = false;
+		m_Jumping_quirk = false;
 		break;
 	case Chip8::SCHIP:
-		m_VFreset_quirk		= false;
-		m_Memory_quirk		= false;
+		m_VFreset_quirk = false;
+		m_Memory_quirk = false;
 		m_DisplayWait_quirk = false;
-		m_Clipping_quirk	= true;
-		m_Shifting_quirk	= true;
-		m_Jumping_quirk		= true;
+		m_Clipping_quirk = true;
+		m_Shifting_quirk = true;
+		m_Jumping_quirk = true;
 		break;
 	case Chip8::OCTO:
-		m_VFreset_quirk		= false;
-		m_Memory_quirk		= true;
+		m_VFreset_quirk = false;
+		m_Memory_quirk = true;
 		m_DisplayWait_quirk = false;
-		m_Clipping_quirk	= false;
-		m_Shifting_quirk	= false;
-		m_Jumping_quirk		= false;
+		m_Clipping_quirk = false;
+		m_Shifting_quirk = false;
+		m_Jumping_quirk = false;
 		break;
 	case Chip8::XOCHIP:
-		m_VFreset_quirk		= false;
-		m_Memory_quirk		= true;
+		m_VFreset_quirk = false;
+		m_Memory_quirk = true;
 		m_DisplayWait_quirk = false;
-		m_Clipping_quirk	= false;
-		m_Shifting_quirk	= false;
-		m_Jumping_quirk		= false;
+		m_Clipping_quirk = false;
+		m_Shifting_quirk = false;
+		m_Jumping_quirk = false;
 		break;
 	default:
 		break;
@@ -123,12 +200,36 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 	m_decoder.x = (opcode >> 8) & 0x000F;
 	m_decoder.y = (opcode >> 4) & 0x000F;
 
+	if (m_decoder.kk != 0x0a)
+	{
+		printf("I = 0x%.4X ", m_indexRegister);
+		for (uint8_t i = 0; i < m_V.size(); i++)
+			printf("V%.1X = 0x%.2X ", i, m_V[i]);
+		printf("PC: % .4X OPCODE: % .4X -> ", m_pc - 2, opcode);
+	}
+		
+
 	switch (m_decoder.type)
 	{
 	case 0x0:
 		if (m_decoder.nnn == 0x0E0)  return std::bind(&Chip8::Fun_00E0, this);
-		else if (m_decoder.nnn == 0x0EE)  return std::bind(&Chip8::Fun_00EE, this);
-		else break;
+		else
+		{
+			switch (m_decoder.kk)
+			{
+			case 0xEE:
+				return std::bind(&Chip8::Fun_00EE, this);
+			case 0xFE:
+				return std::bind(&Chip8::Fun_00FE, this);
+			case 0xFF:
+				return std::bind(&Chip8::Fun_00FF, this);
+			default:
+				// If the opcode does not exit -> ERROR
+				printf("ERROR: Decoded opcode not implemented! OPCODE: %.4X\n", opcode);
+				exit(-1);
+				break;
+			}
+		}
 	case 0x1:
 		return std::bind(&Chip8::Fun_1nnn, this);
 	case 0x2:
@@ -166,7 +267,7 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 			return std::bind(&Chip8::Fun_8xyE, this);
 		default:
 			// If the opcode does not exit -> ERROR
-			std::cout << "ERROR: Decoded opcode not implemented!" << std::endl;
+			printf("ERROR: Decoded opcode not implemented! OPCODE: %.4X\n", opcode);
 			exit(-1);
 		}
 	case 0x9:
@@ -188,7 +289,7 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 			return std::bind(&Chip8::Fun_ExA1, this);
 		default:
 			// If the opcode does not exit -> ERROR
-			std::cout << "ERROR: Decoded opcode not implemented!" << std::endl;
+			printf("ERROR: Decoded opcode not implemented! OPCODE: %.4X\n", opcode);
 			exit(-1);
 		}
 	case 0xF:
@@ -206,6 +307,8 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 			return std::bind(&Chip8::Fun_Fx1E, this);
 		case 0x29:
 			return std::bind(&Chip8::Fun_Fx29, this);
+		case 0x30:
+			return std::bind(&Chip8::Fun_Fx30, this);
 		case 0x33:
 			return std::bind(&Chip8::Fun_Fx33, this);
 		case 0x55:
@@ -214,13 +317,13 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 			return std::bind(&Chip8::Fun_Fx65, this);
 		default:
 			// If the opcode does not exit -> ERROR
-			std::cout << "ERROR: Decoded opcode not implemented!" << std::endl;
+			printf("ERROR: Decoded opcode not implemented! OPCODE: %.4X\n", opcode);
 			exit(-1);
 		}
 	}
 
 	// If the opcode does not exit -> ERROR
-	std::cout << "ERROR: Decoded opcode not implemented!" << std::endl;
+	printf("ERROR: Decoded opcode not implemented! OPCODE: %.4X\n", opcode);
 	exit(-1);
 }
 
@@ -265,13 +368,14 @@ void Chip8::Run()
 
 	while (!m_display.IsWindowClose())
 	{
-		m_keyboard.ProcessInput();
 
 		start = std::chrono::high_resolution_clock::now();
 
 		while (m_instructionCount < m_ips)
 		{
+			m_keyboard.ProcessInput();
 			Simulate_Cycle();
+			m_keyboard.SavePreviousInputs();
 			m_instructionCount++;
 		}
 		m_instructionCount = 0;
@@ -285,7 +389,7 @@ void Chip8::Run()
 		if (m_delayTimer > 0)
 			m_delayTimer--;
 
-		m_keyboard.SavePreviousInputs();
+		
 
 		m_display.Update();
 
@@ -305,6 +409,7 @@ void Chip8::Fun_00E0()
 /*
 00EE - RET
 Return from a subroutine.
+Return from a subroutine.
 
 The interpreter sets the program counter to the address at the top of the stack, then subtracts 1 from the stack pointer.
 */
@@ -313,6 +418,26 @@ void Chip8::Fun_00EE()
 	printf("RET\n");
 	m_sp--;
 	m_pc = *m_sp;
+}
+
+/*
+00FE
+Disable extended screen mode
+*/
+void Chip8::Fun_00FE()
+{
+	m_extendedMode = false;
+	m_display.SetExtendedMode(m_extendedMode);
+}
+
+/*
+00FE
+Enable extended screen mode
+*/
+void Chip8::Fun_00FF()
+{
+	m_extendedMode = true;
+	m_display.SetExtendedMode(m_extendedMode);
 }
 
 /*
@@ -653,7 +778,7 @@ void Chip8::Fun_Cxkk()
 
 	uint8_t random = std::rand() % 256;
 
-	m_V[m_decoder.x] &= random;
+	m_V[m_decoder.x] = random & m_decoder.kk;
 }
 
 /*
@@ -675,15 +800,32 @@ void Chip8::Fun_Dxyn()
 
 	m_V[0xF] = 0;
 
-	for (int row = 0; row < m_decoder.n; row++)
+	if (m_decoder.n > 0)
 	{
-		uint8_t spriteRow = m_memory[m_indexRegister + row];
-		for (int col = 0; col < 8; col++)
+		for (int row = 0; row < m_decoder.n; row++)
 		{
-			bool pixel = spriteRow & (0x80 >> col);
-			bool conflict = m_display.ChangePixelValue(xPos, yPos, col, row, pixel, m_Clipping_quirk);
-			if (conflict)
-				m_V[0xF] = 1;
+			uint8_t spriteRow = m_memory[m_indexRegister + row];
+			for (int col = 0; col < 8; col++)
+			{
+				bool pixel = spriteRow & (0x80 >> col);
+				bool conflict = m_display.ChangePixelValue(xPos, yPos, col, row, pixel, m_Clipping_quirk);
+				if (conflict)
+					m_V[0xF] = 1;
+			}
+		}
+	}
+	else // Draw a sprite of 16x16
+	{
+		for (int row = 0; row < 16; row++)
+		{
+			uint16_t spriteRow = (m_memory[m_indexRegister + row * 2] << 8) | m_memory[m_indexRegister + row * 2 + 1];
+			for (int col = 0; col < 16; col++)
+			{
+				bool pixel = spriteRow & (0x8000 >> col);
+				bool conflict = m_display.ChangePixelValue(xPos, yPos, col, row, pixel, m_Clipping_quirk);
+				if (conflict)
+					m_V[0xF] = 1;
+			}
 		}
 	}
 
@@ -740,7 +882,7 @@ All execution stops until a key is pressed, then the value of that key is stored
 */
 void Chip8::Fun_Fx0A()
 {
-	printf("LD V%X, K (Waiting for key press...)\n", m_decoder.x);
+	//printf("LD V%X, K (Waiting for key press...)\n", m_decoder.x);
 
 	int key = -1;
 	if (m_keyboard.WaitForInput(&key))
@@ -793,7 +935,7 @@ void Chip8::Fun_Fx1E()
 
 /*
 Fx29 - LD F, Vx
-Set I = location of sprite for digit Vx.
+LORES FONT: Set I = location of sprite for digit Vx.
 
 The value of I is set to the location for the hexadecimal sprite corresponding to the value of Vx.
 */
@@ -802,6 +944,19 @@ void Chip8::Fun_Fx29()
 	printf("LD F, V%X\n", m_decoder.x);
 
 	m_indexRegister = m_V[m_decoder.x] * 5; // The font sprites have a length of 5 bytes.
+}
+
+/*
+Fx30 - LD F, Vx
+HIRES FONT: Set I = location of sprite for digit Vx.
+
+The value of I is set to the location for the hexadecimal sprite corresponding to the value of Vx.
+*/
+void Chip8::Fun_Fx30()
+{
+	printf("LD F, V%X\n", m_decoder.x);
+
+	m_indexRegister = m_V[m_decoder.x] * 10; // The font sprites have a length of 10 bytes.
 }
 
 /*

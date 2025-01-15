@@ -21,6 +21,8 @@ public:
 
 	void Render();
 
+	void SetExtendedMode(const bool enable);
+
 	bool ChangePixelValue(unsigned int x, unsigned int y, unsigned int col, unsigned int row, const bool value, const bool clipping); // Returns wheter there was a collision or not
 
 	bool IsWindowClose();
