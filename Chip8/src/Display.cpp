@@ -91,6 +91,23 @@ void Display::CLS()
 	SDL_RenderClear(m_renderer.get());
 }
 
+void Display::ScrollUp(const unsigned int lines)
+{
+	for (int i = 0; i < lines; i++)
+	{
+		for (int row = 0; row < m_displayHeight - 1; row++)
+		{
+			for (int col = 0; col <= m_displayWidth - 1; col++)
+			{
+				m_display[m_displayWidth * row + col] = m_display[m_displayWidth * (row + 1) + col];
+			}
+		}
+		
+		for (int col = 0; col < m_displayWidth; col++)
+			m_display[m_displayWidth * (m_displayHeight-1) + col] = 0;
+	}
+}
+
 void Display::ScrollDown(const unsigned int lines)
 {
 	for (int i = 0; i < lines; i++)
@@ -193,6 +210,7 @@ void Display::SetExtendedMode(const bool enable)
 
 	CLS();
 	m_display.resize(m_displayWidth * m_displayHeight, 0);
+	//Render(); ?
 }
 
 bool Display::ChangePixelValue(unsigned int x, unsigned int y, unsigned int col, unsigned int row, const bool value, const bool clipping)

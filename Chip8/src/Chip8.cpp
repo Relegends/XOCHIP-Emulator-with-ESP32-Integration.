@@ -212,7 +212,13 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 	switch (m_decoder.type)
 	{
 	case 0x0:
-		if (m_decoder.y == 0xC) return std::bind(&Chip8::Fun_00CN, this);
+		switch (m_decoder.y)
+		{
+		case 0xC:
+			return std::bind(&Chip8::Fun_00Cn, this);
+		case 0xD:
+			return std::bind(&Chip8::Fun_00Dn, this);
+		}
 		switch (m_decoder.kk)
 		{
 		case 0xE0:
@@ -387,13 +393,23 @@ void Chip8::Run()
 }
 
 /*
-00CN - SCROLL D N
+00CN - SCD N
 Scroll display N lines down.
 */
-void Chip8::Fun_00CN()
+void Chip8::Fun_00Cn()
 {
 	printf("SCD %d\n", m_decoder.n);
 	m_display.ScrollDown(m_decoder.n);
+}
+
+/*
+00CN - SCU N
+Scroll display N lines up.
+*/
+void Chip8::Fun_00Dn()
+{
+	printf("SCU %d\n", m_decoder.n);
+	m_display.ScrollUp(m_decoder.n);
 }
 
 /*
@@ -836,7 +852,7 @@ void Chip8::Fun_Dxyn()
 	}
 	else // Draw a sprite of 16x16
 	{
-		if (m_interpreter != VIP && m_interpreter != SCHIP || m_interpreter == SCHIP && m_extendedMode)
+		if (m_interpreter == OCTO || m_interpreter == SCHIP && m_extendedMode)
 		{
 			for (int row = 0; row < 16; row++)
 			{
@@ -1077,6 +1093,7 @@ void Chip8::Fun_Fx65()
 */
 void Chip8::Fun_Fx75()
 {
+
 }
 
 /*

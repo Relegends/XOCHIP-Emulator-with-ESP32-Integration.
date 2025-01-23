@@ -19,6 +19,7 @@ public:
 
 	void CLS();	// Clear Screen
 
+	void ScrollUp(const unsigned int lines);
 	void ScrollDown(const unsigned int lines);
 	void ScrollRight(const unsigned int lines);
 	void ScrollLeft(const unsigned int lines);

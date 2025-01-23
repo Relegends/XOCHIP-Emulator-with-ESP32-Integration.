@@ -31,7 +31,8 @@ private:
 	uint16_t Fetch();
 	std::function<void()> Decode(uint16_t opcode);
 
-	void Fun_00CN(); // SCD N
+	void Fun_00Cn(); // SCD N
+	void Fun_00Dn(); // SCD U
 	void Fun_00E0(); // CLS
 	void Fun_00EE(); // RET
 	void Fun_00FB(); // SCR
