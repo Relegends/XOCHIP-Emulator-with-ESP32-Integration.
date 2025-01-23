@@ -15,6 +15,7 @@ Display::Display(const std::string& name,
 	m_backgroundColor = backgroundColor;
 
 	m_closeWindow = false;
+	m_extendedMode = false;
 	m_display.resize(displayHeight * displayWidth);
 }
 
@@ -90,6 +91,55 @@ void Display::CLS()
 	SDL_RenderClear(m_renderer.get());
 }
 
+void Display::ScrollDown(const unsigned int lines)
+{
+	for (int i = 0; i < lines; i++)
+	{
+		for (int row = m_displayHeight - 1; row > 0; row--)
+		{
+			for (int col = m_displayWidth - 1; col >= 0; col--)
+			{
+				m_display[m_displayWidth * row + col] = m_display[m_displayWidth * (row - 1) + col];
+			}
+		}
+		std::fill(m_display.begin(), m_display.begin() + m_displayWidth, 0);
+	}
+}
+
+void Display::ScrollRight(const unsigned int lines)
+{
+	for (int i = 0; i < lines; i++)
+	{
+		for (int row = m_displayHeight - 1; row > 0; row--)
+		{
+			for (int col = m_displayWidth - 1; col >= 0; col--)
+			{
+				m_display[m_displayWidth * row + col] = m_display[m_displayWidth * row + (col - 1)];
+			}
+		}
+
+		for (int row = 0; row < m_displayHeight; row++)
+			m_display[m_displayWidth * row] = 0;
+	}
+}
+
+void Display::ScrollLeft(const unsigned int lines)
+{
+	for (int i = 0; i < lines; i++)
+	{
+		for (int col = 0; col < m_displayWidth - 1; col++)
+		{
+			for (int row = 0; row <= m_displayHeight - 1; row++)
+			{
+				m_display[m_displayWidth * row + col] = m_display[m_displayWidth * row + (col + 1)];
+			}
+		}
+
+		for (int row = 0; row < m_displayHeight; row++)
+			m_display[m_displayWidth * row + (m_displayWidth - 1)] = 0;
+	}
+}
+
 void Display::DrawPixel(unsigned int x, unsigned int y, bool colored)
 {
 	SDL_Rect pixel;
@@ -97,7 +147,7 @@ void Display::DrawPixel(unsigned int x, unsigned int y, bool colored)
 	unsigned int scaleX = static_cast<unsigned int>(m_windowWidth / m_displayWidth);
 	unsigned int scaleY = static_cast<unsigned int>(m_windowHeight / m_displayHeight);
 
-	pixel.x = x * scaleX ;
+	pixel.x = x * scaleX;
 	pixel.y = y * scaleY;
 	pixel.w = scaleX;
 	pixel.h = scaleY;
@@ -107,7 +157,7 @@ void Display::DrawPixel(unsigned int x, unsigned int y, bool colored)
 			(m_mainColor >> 24) & 0xFF, (m_mainColor >> 16) & 0xFF, (m_mainColor >> 8) & 0xFF,
 			m_mainColor & 0xFF);
 	else
-		SDL_SetRenderDrawColor(m_renderer.get(), 
+		SDL_SetRenderDrawColor(m_renderer.get(),
 			(m_backgroundColor >> 24) & 0xFF, (m_backgroundColor >> 16) & 0xFF, (m_backgroundColor >> 8) & 0xFF,
 			m_backgroundColor & 0xFF);
 
@@ -129,7 +179,8 @@ void Display::Render()
 
 void Display::SetExtendedMode(const bool enable)
 {
-	if (enable)
+	m_extendedMode = enable;
+	if (m_extendedMode)
 	{
 		m_displayWidth = 128;
 		m_displayHeight = 64;
@@ -163,7 +214,7 @@ bool Display::ChangePixelValue(unsigned int x, unsigned int y, unsigned int col,
 			posX %= m_displayWidth;
 		else if (posX >= m_displayWidth) // Clipping
 			return false;
-			
+
 		if (y >= m_displayHeight)
 			posY %= m_displayHeight;
 		else if (posY >= m_displayHeight) // Clipping
@@ -179,7 +230,7 @@ bool Display::ChangePixelValue(unsigned int x, unsigned int y, unsigned int col,
 	return conflict;
 }
 
-bool Display::IsWindowClose() 
+bool Display::IsWindowClose()
 {
 	return m_closeWindow;
 }

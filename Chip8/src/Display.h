@@ -19,6 +19,10 @@ public:
 
 	void CLS();	// Clear Screen
 
+	void ScrollDown(const unsigned int lines);
+	void ScrollRight(const unsigned int lines);
+	void ScrollLeft(const unsigned int lines);
+
 	void Render();
 
 	void SetExtendedMode(const bool enable);
@@ -41,6 +45,8 @@ private:
 
 	unsigned int m_displayWidth;
 	unsigned int m_displayHeight;
+
+	bool m_extendedMode;
 
 	std::string m_windowName;
 

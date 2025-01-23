@@ -31,10 +31,13 @@ private:
 	uint16_t Fetch();
 	std::function<void()> Decode(uint16_t opcode);
 
+	void Fun_00CN(); // SCD N
 	void Fun_00E0(); // CLS
 	void Fun_00EE(); // RET
-	void Fun_00FE(); // Disable extended screen mode
-	void Fun_00FF(); // Enable extended screen mode
+	void Fun_00FB(); // SCR
+	void Fun_00FC(); // SCL
+	void Fun_00FE(); // LOW
+	void Fun_00FF(); // HIGH
 	void Fun_1nnn(); // JP addr
 	void Fun_2nnn(); // CALL addr
 	void Fun_3xkk(); // SE Vx, byte
@@ -68,7 +71,9 @@ private:
 	void Fun_Fx33(); // LD B, Vx
 	void Fun_Fx55(); // LD [I], Vx
 	void Fun_Fx65(); // LD Vx, [I]
-
+	void Fun_Fx75(); // LD R, VX
+	void Fun_Fx85(); // LD VX, R
+	
 private:
 	std::array<uint8_t, 16> m_V;
 	std::array<uint8_t, 0x1000> m_memory;

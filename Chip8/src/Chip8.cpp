@@ -207,29 +207,28 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 			printf("V%.1X = 0x%.2X ", i, m_V[i]);
 		printf("PC: % .4X OPCODE: % .4X -> ", m_pc - 2, opcode);
 	}
-		
+
 
 	switch (m_decoder.type)
 	{
 	case 0x0:
-		if (m_decoder.nnn == 0x0E0)  return std::bind(&Chip8::Fun_00E0, this);
-		else
+		if (m_decoder.y == 0xC) return std::bind(&Chip8::Fun_00CN, this);
+		switch (m_decoder.kk)
 		{
-			switch (m_decoder.kk)
-			{
-			case 0xEE:
-				return std::bind(&Chip8::Fun_00EE, this);
-			case 0xFE:
-				return std::bind(&Chip8::Fun_00FE, this);
-			case 0xFF:
-				return std::bind(&Chip8::Fun_00FF, this);
-			default:
-				// If the opcode does not exit -> ERROR
-				printf("ERROR: Decoded opcode not implemented! OPCODE: %.4X\n", opcode);
-				exit(-1);
-				break;
-			}
+		case 0xE0:
+			return std::bind(&Chip8::Fun_00E0, this);
+		case 0xEE:
+			return std::bind(&Chip8::Fun_00EE, this);
+		case 0xFB:
+			return std::bind(&Chip8::Fun_00FB, this);
+		case 0xFC:
+			return std::bind(&Chip8::Fun_00FC, this);
+		case 0xFE:
+			return std::bind(&Chip8::Fun_00FE, this);
+		case 0xFF:
+			return std::bind(&Chip8::Fun_00FF, this);
 		}
+		break;
 	case 0x1:
 		return std::bind(&Chip8::Fun_1nnn, this);
 	case 0x2:
@@ -265,11 +264,8 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 			return std::bind(&Chip8::Fun_8xy7, this);
 		case 0xE:
 			return std::bind(&Chip8::Fun_8xyE, this);
-		default:
-			// If the opcode does not exit -> ERROR
-			printf("ERROR: Decoded opcode not implemented! OPCODE: %.4X\n", opcode);
-			exit(-1);
 		}
+		break;
 	case 0x9:
 		return std::bind(&Chip8::Fun_9xy0, this);
 	case 0xA:
@@ -287,11 +283,8 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 			return std::bind(&Chip8::Fun_Ex9E, this);
 		case 0xA1:
 			return std::bind(&Chip8::Fun_ExA1, this);
-		default:
-			// If the opcode does not exit -> ERROR
-			printf("ERROR: Decoded opcode not implemented! OPCODE: %.4X\n", opcode);
-			exit(-1);
 		}
+		break;
 	case 0xF:
 		switch (m_decoder.kk)
 		{
@@ -315,11 +308,8 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 			return std::bind(&Chip8::Fun_Fx55, this);
 		case 0x65:
 			return std::bind(&Chip8::Fun_Fx65, this);
-		default:
-			// If the opcode does not exit -> ERROR
-			printf("ERROR: Decoded opcode not implemented! OPCODE: %.4X\n", opcode);
-			exit(-1);
 		}
+		break;
 	}
 
 	// If the opcode does not exit -> ERROR
@@ -389,11 +379,21 @@ void Chip8::Run()
 		if (m_delayTimer > 0)
 			m_delayTimer--;
 
-		
+
 
 		m_display.Update();
 
 	}
+}
+
+/*
+00CN - SCROLL D N
+Scroll display N lines down.
+*/
+void Chip8::Fun_00CN()
+{
+	printf("SCD %d\n", m_decoder.n);
+	m_display.ScrollDown(m_decoder.n);
 }
 
 /*
@@ -418,6 +418,26 @@ void Chip8::Fun_00EE()
 	printf("RET\n");
 	m_sp--;
 	m_pc = *m_sp;
+}
+
+/*
+00FB - SCROLL R N
+Scroll display 4 pixels to the right.
+*/
+void Chip8::Fun_00FB()
+{
+	printf("SCR\n");
+	m_display.ScrollRight(4);
+}
+
+/*
+00FC - SCL N
+Scroll display 4 pixels to the left.
+*/
+void Chip8::Fun_00FC()
+{
+	printf("SCL\n");
+	m_display.ScrollLeft(4);
 }
 
 /*
@@ -816,15 +836,18 @@ void Chip8::Fun_Dxyn()
 	}
 	else // Draw a sprite of 16x16
 	{
-		for (int row = 0; row < 16; row++)
+		if (m_interpreter != VIP && m_interpreter != SCHIP || m_interpreter == SCHIP && m_extendedMode)
 		{
-			uint16_t spriteRow = (m_memory[m_indexRegister + row * 2] << 8) | m_memory[m_indexRegister + row * 2 + 1];
-			for (int col = 0; col < 16; col++)
+			for (int row = 0; row < 16; row++)
 			{
-				bool pixel = spriteRow & (0x8000 >> col);
-				bool conflict = m_display.ChangePixelValue(xPos, yPos, col, row, pixel, m_Clipping_quirk);
-				if (conflict)
-					m_V[0xF] = 1;
+				uint16_t spriteRow = (m_memory[m_indexRegister + row * 2] << 8) | m_memory[m_indexRegister + row * 2 + 1];
+				for (int col = 0; col < 16; col++)
+				{
+					bool pixel = spriteRow & (0x8000 >> col);
+					bool conflict = m_display.ChangePixelValue(xPos, yPos, col, row, pixel, m_Clipping_quirk);
+					if (conflict)
+						m_V[0xF] = 1;
+				}
 			}
 		}
 	}
@@ -1046,4 +1069,20 @@ void Chip8::Fun_Fx65()
 		for (uint8_t i = 0; i <= m_decoder.x; i++)
 			m_V[i] = m_memory[m_indexRegister + i];
 	}
+}
+
+/*
+	Fx75 - LD R, VX
+	Store V0 through VX to HP-48 RPL user flags (X <= 7).
+*/
+void Chip8::Fun_Fx75()
+{
+}
+
+/*
+	Fx85 - LD VX, R
+	Read V0 through VX to HP-48 RPL user flags (X <= 7).
+*/
+void Chip8::Fun_Fx85()
+{
 }
