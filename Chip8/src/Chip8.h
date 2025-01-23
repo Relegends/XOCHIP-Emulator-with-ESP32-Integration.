@@ -44,6 +44,8 @@ private:
 	void Fun_3xkk(); // SE Vx, byte
 	void Fun_4xkk(); // SNE Vx, byte
 	void Fun_5xy0(); // SE Vx, Vy
+	void Fun_5xy2(); // LD [I], Vx-Vy
+	void Fun_5xy3(); // LD Vx-Vy, [I]
 	void Fun_6xkk(); // LD Vx, byte
 	void Fun_7xkk(); // ADD Vx, byte
 	void Fun_8xy0(); // LD Vx, Vy
@@ -62,6 +64,7 @@ private:
 	void Fun_Dxyn(); // DRW Vx, Vy, nibble
 	void Fun_Ex9E(); // SKP Vx
 	void Fun_ExA1(); // SKNP Vx
+	void Fun_F000(); // DW #F000, #NNNN
 	void Fun_Fx07(); // LD Vx, DT
 	void Fun_Fx0A(); // LD Vx, K
 	void Fun_Fx15(); // LD DT, Vx

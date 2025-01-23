@@ -244,7 +244,16 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 	case 0x4:
 		return std::bind(&Chip8::Fun_4xkk, this);
 	case 0x5:
-		return std::bind(&Chip8::Fun_5xy0, this);
+		switch (m_decoder.n)
+		{
+		case 0x0:
+			return std::bind(&Chip8::Fun_5xy0, this);
+		case 0x2:
+			return std::bind(&Chip8::Fun_5xy2, this);
+		case 0x3:
+			return std::bind(&Chip8::Fun_5xy3, this);
+		}
+		break;
 	case 0x6:
 		return std::bind(&Chip8::Fun_6xkk, this);
 	case 0x7:
@@ -294,6 +303,8 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 	case 0xF:
 		switch (m_decoder.kk)
 		{
+		case 0x00:
+			return std::bind(&Chip8::Fun_F000, this);
 		case 0x07:
 			return std::bind(&Chip8::Fun_Fx07, this);
 		case 0x0A:
@@ -540,6 +551,42 @@ void Chip8::Fun_5xy0()
 	printf("SE V%X, V%X\n", m_decoder.x, m_decoder.y);
 	if (m_V[m_decoder.x] == m_V[m_decoder.y])
 		m_pc += 2;
+}
+
+/*
+5xy2 - LD [I], Vx-Vy
+
+Write registers Vx to Vy to memory pointed to by I.
+*/
+void Chip8::Fun_5xy2()
+{
+	printf("LD [I], V%X-V%X\n", m_decoder.x, m_decoder.y);
+
+	uint8_t increment = 0;
+
+	for (uint8_t index = m_decoder.x; index <= m_decoder.y; index++)
+	{
+		m_memory[m_indexRegister + increment] = m_V[index];
+		increment++;
+	}
+}
+
+/*
+5xy3 - LD Vx-Vy, [I]
+
+Load registers Vx to Vy from memory pointed to by I.
+*/
+void Chip8::Fun_5xy3()
+{
+	printf("LD V%X-V%X, [I]\n", m_decoder.x, m_decoder.y);
+
+	uint8_t increment = 0;
+
+	for (uint8_t index = m_decoder.x; index <= m_decoder.y; index++)
+	{
+		m_V[index] = m_memory[m_indexRegister + increment];
+		increment++;
+	}
 }
 
 /*
@@ -898,6 +945,22 @@ void Chip8::Fun_ExA1()
 
 	if (!m_keyboard.ReadKeyboard(m_V[m_decoder.x]))
 		m_pc += 2;
+}
+
+/*
+ExA1 - DW #F000, #NNNN
+
+Assign next 16 bit word to I, and set PC behind it, this is a four byte instruction.
+*/
+void Chip8::Fun_F000()
+{
+	uint16_t word = Fetch(); // Get next 2 bytes to get the value of I and increment pc
+
+	printf("DW F000 %.4X\n", word);
+
+	m_indexRegister = word;
+
+	// PC alredy incremented
 }
 
 /*
