@@ -10,8 +10,10 @@ Chip8::Chip8() :
 	m_stack({ 0 }),
 	m_sp(m_stack.begin()),
 	m_config("./Config/Config.toml"),
-	m_display("Chip 8", m_config.GetWindowWidth(), m_config.GetWindowHeight(), m_config.GetDisplayWidth(), m_config.GetDisplayHeight(),
-		m_config.GetDisplayMainColor(), m_config.GetDisplayBackgroundColor()),
+	m_display("Chip 8", m_config.GetWindowWidth(), m_config.GetWindowHeight(),
+		m_config.GetDisplayWidth(), m_config.GetDisplayHeight(),
+		m_config.GetDisplayBackgroundColor(), m_config.GetDisplayForeground_1Color(),
+		m_config.GetDisplayForeground_2Color(), m_config.GetDisplayBlendedColor()),
 	m_keyboard({ m_config.GetInputMap() }),
 	m_decoder({ 0 }),
 	m_interpreter((Chip8::INTERPRETER)m_config.GetInterpretedMode()),
@@ -48,7 +50,7 @@ void Chip8::LoadFontSet()
 			0xF0, 0x80, 0x80, 0x80, 0xF0, // C
 			0xE0, 0x90, 0x90, 0x90, 0xE0, // D
 			0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-			0xF0, 0x80, 0xF0, 0x80, 0x80 // F
+			0xF0, 0x80, 0xF0, 0x80, 0x80  // F
 		};
 		break;
 	case Chip8::SCHIP:
@@ -305,6 +307,8 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 		{
 		case 0x00:
 			return std::bind(&Chip8::Fun_F000, this);
+		case 0x01:
+			return std::bind(&Chip8::Fun_Fx01, this);
 		case 0x07:
 			return std::bind(&Chip8::Fun_Fx07, this);
 		case 0x0A:
@@ -473,8 +477,8 @@ Disable extended screen mode
 */
 void Chip8::Fun_00FE()
 {
-	m_extendedMode = false;
-	m_display.SetExtendedMode(m_extendedMode);
+	printf("LOW\n");
+	m_display.SetExtendedMode(false);
 }
 
 /*
@@ -483,8 +487,8 @@ Enable extended screen mode
 */
 void Chip8::Fun_00FF()
 {
-	m_extendedMode = true;
-	m_display.SetExtendedMode(m_extendedMode);
+	printf("HIGH\n");
+	m_display.SetExtendedMode(true);
 }
 
 /*
@@ -885,21 +889,42 @@ void Chip8::Fun_Dxyn()
 
 	if (m_decoder.n > 0)
 	{
-		for (int row = 0; row < m_decoder.n; row++)
+		if (m_display.GetActivePlane() != Display::ACTIVEPLANE::BOTH)
 		{
-			uint8_t spriteRow = m_memory[m_indexRegister + row];
-			for (int col = 0; col < 8; col++)
+			for (int row = 0; row < m_decoder.n; row++)
 			{
-				bool pixel = spriteRow & (0x80 >> col);
-				bool conflict = m_display.ChangePixelValue(xPos, yPos, col, row, pixel, m_Clipping_quirk);
-				if (conflict)
-					m_V[0xF] = 1;
+				uint8_t spriteRow = m_memory[m_indexRegister + row];
+				for (int col = 0; col < 8; col++)
+				{
+					bool pixel = spriteRow & (0x80 >> col);
+					bool conflict = m_display.ChangePixelValue(xPos, yPos, col, row, pixel, m_Clipping_quirk);
+					if (conflict)
+						m_V[0xF] = 1;
+				}
+			}
+		}
+		else
+		{
+			for (int row = 0; row < m_decoder.n; row++)
+			{
+				uint8_t spriteRowLSB = m_memory[m_indexRegister + row];
+				uint8_t spriteRowMSB = m_memory[m_indexRegister + row + m_decoder.n];
+				for (int col = 0; col < 8; col++)
+				{
+					bool pixel = spriteRowLSB & (0x80 >> col);
+					bool conflictLSB = m_display.ChangePixelValue(xPos, yPos, col, row, pixel, m_Clipping_quirk, Display::ACTIVEPLANE::LSB_PLANE);
+					pixel = spriteRowMSB & (0x80 >> col);
+					bool conflictMSB = m_display.ChangePixelValue(xPos, yPos, col, row, pixel, m_Clipping_quirk, Display::ACTIVEPLANE::MSB_PLANE);
+					if (conflictLSB || conflictMSB)
+						m_V[0xF] = 1;
+				}
 			}
 		}
 	}
 	else // Draw a sprite of 16x16
 	{
-		if (m_interpreter == OCTO || m_interpreter == SCHIP && m_extendedMode)
+		if ((m_interpreter == SCHIP && m_display.GetExtendedMode()) || m_interpreter == OCTO ||
+			(m_interpreter == XOCHIP && m_display.GetActivePlane() != Display::ACTIVEPLANE::BOTH))
 		{
 			for (int row = 0; row < 16; row++)
 			{
@@ -909,6 +934,23 @@ void Chip8::Fun_Dxyn()
 					bool pixel = spriteRow & (0x8000 >> col);
 					bool conflict = m_display.ChangePixelValue(xPos, yPos, col, row, pixel, m_Clipping_quirk);
 					if (conflict)
+						m_V[0xF] = 1;
+				}
+			}
+		}
+		else if (m_interpreter == XOCHIP && m_display.GetActivePlane() == Display::ACTIVEPLANE::BOTH)
+		{
+			for (int row = 0; row < 16; row++)
+			{
+				uint16_t spriteRowLSB = (m_memory[m_indexRegister + row * 2] << 8) | m_memory[m_indexRegister + row * 2 + 1];
+				uint16_t spriteRowMSB = (m_memory[m_indexRegister + (row + 16) * 2] << 8) | m_memory[m_indexRegister + (row + 16) * 2 + 1];
+				for (int col = 0; col < 16; col++)
+				{
+					bool pixel = spriteRowLSB & (0x80 >> col);
+					bool conflictLSB = m_display.ChangePixelValue(xPos, yPos, col, row, pixel, m_Clipping_quirk, Display::ACTIVEPLANE::LSB_PLANE);
+					pixel = spriteRowMSB & (0x80 >> col);
+					bool conflictMSB = m_display.ChangePixelValue(xPos, yPos, col, row, pixel, m_Clipping_quirk, Display::ACTIVEPLANE::MSB_PLANE);
+					if (conflictLSB || conflictMSB)
 						m_V[0xF] = 1;
 				}
 			}
@@ -961,6 +1003,18 @@ void Chip8::Fun_F000()
 	m_indexRegister = word;
 
 	// PC alredy incremented
+}
+
+/*
+FX01 - DW #Fx01
+
+Select bit planes to draw on when drawing with Dxy0/Dxyn.
+*/
+void Chip8::Fun_Fx01()
+{
+	printf("DW #F%x01\n", m_decoder.x);
+
+	m_display.SetActivePlane(m_decoder.x);
 }
 
 /*

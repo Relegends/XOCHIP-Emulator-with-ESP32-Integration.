@@ -19,8 +19,10 @@ public:
 	unsigned int GetWindowHeight() const;
 	unsigned int GetDisplayWidth() const;
 	unsigned int GetDisplayHeight() const;
-	uint32_t GetDisplayMainColor() const;
 	uint32_t GetDisplayBackgroundColor() const;
+	uint32_t GetDisplayForeground_1Color() const;
+	uint32_t GetDisplayForeground_2Color() const;
+	uint32_t GetDisplayBlendedColor() const;
 
 	std::vector<std::pair<std::string, int>> GetInputMap() const;
 

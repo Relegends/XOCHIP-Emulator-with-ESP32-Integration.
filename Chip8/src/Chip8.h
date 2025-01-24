@@ -65,6 +65,7 @@ private:
 	void Fun_Ex9E(); // SKP Vx
 	void Fun_ExA1(); // SKNP Vx
 	void Fun_F000(); // DW #F000, #NNNN
+	void Fun_Fx01(); // DW #Fx01
 	void Fun_Fx07(); // LD Vx, DT
 	void Fun_Fx0A(); // LD Vx, K
 	void Fun_Fx15(); // LD DT, Vx
@@ -120,8 +121,6 @@ private:
 	bool m_Clipping_quirk;
 	bool m_Shifting_quirk;
 	bool m_Jumping_quirk;
-
-	bool m_extendedMode;
 
 	unsigned int m_ips;
 	unsigned int m_instructionCount;

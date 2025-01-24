@@ -1,6 +1,6 @@
 # Interpreter: VIP = 0 * SCHIP = 1 * OCTO = 2 * XOChip = 3
 [InterpreterMode]
-interpreter = 2
+interpreter = 3
 
 #Quirks Values: -1 = Default by Interpreter, 0 = OFF, 1 = 0N 
 [Quirks]
@@ -17,8 +17,10 @@ IPS = 20
 [Display]
 windowResolution = [640, 320]
 displayResolution = [64, 32]
-mainColor = 0xffcc00ff
-backgroundColor = 0x996600ff
+backgroundColor = 0x996600FF
+foreground1Color = 0xffcc00FF
+foreground2Color = 0xFF6600FF
+blendedColor = 0x662200FF
 
 [Keyboard]
 1 = ["1", 1	]

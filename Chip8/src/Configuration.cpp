@@ -105,14 +105,28 @@ unsigned int Configuration::GetDisplayHeight() const
 	return m_config["Display"]["displayResolution"][1].value_or(32);
 }
 
-uint32_t Configuration::GetDisplayMainColor() const
-{
-	return m_config["Display"]["mainColor"].value_or<uint32_t>(0xFFFFFFFF);
-}
-
 uint32_t Configuration::GetDisplayBackgroundColor() const
 {
-	return m_config["Display"]["backgroundColor"].value_or<uint32_t>(0x00000000);
+	uint32_t color = m_config["Display"]["backgroundColor"].value_or<uint32_t>(0x000000);
+	return color >> 8;
+}
+
+uint32_t Configuration::GetDisplayForeground_1Color() const
+{
+	uint32_t color = m_config["Display"]["foreground1Color"].value_or<uint32_t>(0xFFFFFFFF);
+	return color >> 8;
+}
+
+uint32_t Configuration::GetDisplayForeground_2Color() const
+{
+	uint32_t color = m_config["Display"]["foreground2Color"].value_or<uint32_t>(0x222222FF);
+	return color >> 8;
+}
+
+uint32_t Configuration::GetDisplayBlendedColor() const
+{
+	uint32_t color = m_config["Display"]["blendedColor"].value_or<uint32_t>(0x333333FF);
+	return color >> 8;
 }
 
 std::vector<std::pair<std::string, int>> Configuration::GetInputMap() const
