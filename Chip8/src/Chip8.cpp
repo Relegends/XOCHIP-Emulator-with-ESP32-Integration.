@@ -245,12 +245,11 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 
 	if (m_decoder.kk != 0x0a)
 	{
-		printf("I = 0x%.4X ", m_indexRegister);
+		LOG("I = 0x%.4X ", m_indexRegister);
 		for (uint8_t i = 0; i < m_V.size(); i++)
-			printf("V%.1X = 0x%.2X ", i, m_V[i]);
-		printf("PC: % .4X OPCODE: % .4X -> ", m_pc - 2, opcode);
+			LOG("V%.1X = 0x%.2X ", i, m_V[i]);
+		LOG("PC: % .4X OPCODE: % .4X -> ", m_pc - 2, opcode);
 	}
-
 
 	switch (m_decoder.type)
 	{
@@ -375,7 +374,7 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 	}
 
 	// If the opcode does not exit -> ERROR
-	printf("ERROR: Decoded opcode not implemented! OPCODE: %.4X\n", opcode);
+	LOG("ERROR: Decoded opcode not implemented! OPCODE: %.4X\n", opcode);
 	exit(-1);
 }
 
@@ -430,7 +429,7 @@ void Chip8::Run()
 			Simulate_Cycle();
 			auto e = std::chrono::high_resolution_clock::now();
 			auto el = std::chrono::duration_cast<std::chrono::microseconds>(e - s);
-			std::cout << "Instruction executed in: " << el.count() << " us\n";
+			LOG("Instruction executed in: %d us\n", el.count());
 
 			m_keyboard.SavePreviousInputs();
 			m_instructionCount++;
@@ -441,8 +440,7 @@ void Chip8::Run()
 
 		elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-		std::cout << "Instructions executed: " << m_ipf << " in " << elapsedTime << " us\n";
-
+		LOG_PRINT("Instructions executed: %d in %d us\n", 0, m_ipf, elapsedTime);
 
 		std::this_thread::sleep_for(thresholdCPU > elapsedTime ? (thresholdCPU - elapsedTime) : std::chrono::milliseconds(0));
 
@@ -460,7 +458,7 @@ Scroll display N lines down.
 */
 void Chip8::Fun_00Cn()
 {
-	printf("SCD %d\n", m_decoder.n);
+	LOG("SCD %d\n", m_decoder.n);
 	m_display.ScrollDown(m_decoder.n);
 }
 
@@ -470,7 +468,7 @@ Scroll display N lines up.
 */
 void Chip8::Fun_00Dn()
 {
-	printf("SCU %d\n", m_decoder.n);
+	LOG("SCU %d\n", m_decoder.n);
 	m_display.ScrollUp(m_decoder.n);
 }
 
@@ -480,7 +478,7 @@ Clear the display.
 */
 void Chip8::Fun_00E0()
 {
-	printf("CLS\n");
+	LOG("CLS\n");
 	m_display.CLS();
 }
 
@@ -493,7 +491,7 @@ The interpreter sets the program counter to the address at the top of the stack,
 */
 void Chip8::Fun_00EE()
 {
-	printf("RET\n");
+	LOG("RET\n");
 	m_sp--;
 	m_pc = *m_sp;
 }
@@ -504,7 +502,7 @@ Scroll display 4 pixels to the right.
 */
 void Chip8::Fun_00FB()
 {
-	printf("SCR\n");
+	LOG("SCR\n");
 	m_display.ScrollRight(4);
 }
 
@@ -514,7 +512,7 @@ Scroll display 4 pixels to the left.
 */
 void Chip8::Fun_00FC()
 {
-	printf("SCL\n");
+	LOG("SCL\n");
 	m_display.ScrollLeft(4);
 }
 
@@ -524,7 +522,7 @@ Disable extended screen mode
 */
 void Chip8::Fun_00FE()
 {
-	printf("LOW\n");
+	LOG("LOW\n");
 	m_display.SetExtendedMode(false);
 }
 
@@ -534,7 +532,7 @@ Enable extended screen mode
 */
 void Chip8::Fun_00FF()
 {
-	printf("HIGH\n");
+	LOG("HIGH\n");
 	m_display.SetExtendedMode(true);
 }
 
@@ -546,7 +544,7 @@ The interpreter sets the program counter to nnn.
 */
 void Chip8::Fun_1nnn()
 {
-	printf("JP 0x%X\n", m_decoder.nnn);
+	LOG("JP 0x%X\n", m_decoder.nnn);
 	m_pc = m_decoder.nnn;
 }
 
@@ -558,7 +556,7 @@ The interpreter increments the stack pointer, then puts the current PC on the to
 */
 void Chip8::Fun_2nnn()
 {
-	printf("CALL 0x%X\n", m_decoder.nnn);
+	LOG("CALL 0x%X\n", m_decoder.nnn);
 	*m_sp = m_pc;
 	m_sp++;
 	m_pc = m_decoder.nnn;
@@ -572,7 +570,7 @@ The interpreter compares register Vx to kk, and if they are equal, increments th
 */
 void Chip8::Fun_3xkk()
 {
-	printf("SE V%X, 0x%X\n", m_decoder.x, m_decoder.kk);
+	LOG("SE V%X, 0x%X\n", m_decoder.x, m_decoder.kk);
 	if (m_V[m_decoder.x] == m_decoder.kk)
 		m_pc += 2;
 }
@@ -585,7 +583,7 @@ The interpreter compares register Vx to kk, and if they are not equal, increment
 */
 void Chip8::Fun_4xkk()
 {
-	printf("SNE V%X, 0x%X\n", m_decoder.x, m_decoder.kk);
+	LOG("SNE V%X, 0x%X\n", m_decoder.x, m_decoder.kk);
 	if (m_V[m_decoder.x] != m_decoder.kk)
 		m_pc += 2;
 }
@@ -599,7 +597,7 @@ The interpreter compares register Vx to register Vy, and if they are equal, incr
 */
 void Chip8::Fun_5xy0()
 {
-	printf("SE V%X, V%X\n", m_decoder.x, m_decoder.y);
+	LOG("SE V%X, V%X\n", m_decoder.x, m_decoder.y);
 	if (m_V[m_decoder.x] == m_V[m_decoder.y])
 		m_pc += 2;
 }
@@ -611,7 +609,7 @@ Write registers Vx to Vy to memory pointed to by I.
 */
 void Chip8::Fun_5xy2()
 {
-	printf("LD [I], V%X-V%X\n", m_decoder.x, m_decoder.y);
+	LOG("LD [I], V%X-V%X\n", m_decoder.x, m_decoder.y);
 
 	uint8_t increment = 0;
 
@@ -629,7 +627,7 @@ Load registers Vx to Vy from memory pointed to by I.
 */
 void Chip8::Fun_5xy3()
 {
-	printf("LD V%X-V%X, [I]\n", m_decoder.x, m_decoder.y);
+	LOG("LD V%X-V%X, [I]\n", m_decoder.x, m_decoder.y);
 
 	uint8_t increment = 0;
 
@@ -648,7 +646,7 @@ The interpreter puts the value kk into register Vx.
 */
 void Chip8::Fun_6xkk()
 {
-	printf("LD V%X, 0x%X\n", m_decoder.x, m_decoder.kk);
+	LOG("LD V%X, 0x%X\n", m_decoder.x, m_decoder.kk);
 	m_V[m_decoder.x] = m_decoder.kk;
 }
 
@@ -660,7 +658,7 @@ Adds the value kk to the value of register Vx, then stores the result in Vx.
 */
 void Chip8::Fun_7xkk()
 {
-	printf("ADD V%X, 0x%X\n", m_decoder.x, m_decoder.kk);
+	LOG("ADD V%X, 0x%X\n", m_decoder.x, m_decoder.kk);
 	m_V[m_decoder.x] += m_decoder.kk;
 }
 
@@ -672,7 +670,7 @@ Stores the value of register Vy in register Vx.
 */
 void Chip8::Fun_8xy0()
 {
-	printf("LD V%X, V%X\n", m_decoder.x, m_decoder.y);
+	LOG("LD V%X, V%X\n", m_decoder.x, m_decoder.y);
 	m_V[m_decoder.x] = m_V[m_decoder.y];
 }
 
@@ -688,7 +686,7 @@ It also resets the flag register to zero IF VF reset quirk is on.
 */
 void Chip8::Fun_8xy1()
 {
-	printf("OR V%X, V%X\n", m_decoder.x, m_decoder.y);
+	LOG("OR V%X, V%X\n", m_decoder.x, m_decoder.y);
 	m_V[m_decoder.x] |= m_V[m_decoder.y];
 
 	if (m_VFreset_quirk)
@@ -707,7 +705,7 @@ It also resets the flag register to zero IF VF reset quirk is on.
 */
 void Chip8::Fun_8xy2()
 {
-	printf("AND V%X, V%X\n", m_decoder.x, m_decoder.y);
+	LOG("AND V%X, V%X\n", m_decoder.x, m_decoder.y);
 	m_V[m_decoder.x] &= m_V[m_decoder.y];
 
 	if (m_VFreset_quirk)
@@ -726,7 +724,7 @@ It also resets the flag register to zero IF VF reset quirk is on.
 */
 void Chip8::Fun_8xy3()
 {
-	printf("XOR V%X, V%X\n", m_decoder.x, m_decoder.y);
+	LOG("XOR V%X, V%X\n", m_decoder.x, m_decoder.y);
 	m_V[m_decoder.x] ^= m_V[m_decoder.y];
 
 	if (m_VFreset_quirk)
@@ -743,7 +741,7 @@ Only the lowest 8 bits of the result are kept, and stored in Vx.
 */
 void Chip8::Fun_8xy4()
 {
-	printf("ADD V%X, V%X\n", m_decoder.x, m_decoder.y);
+	LOG("ADD V%X, V%X\n", m_decoder.x, m_decoder.y);
 	uint16_t result = m_V[m_decoder.x] + m_V[m_decoder.y];
 	m_V[m_decoder.x] = result & 0x00FF;
 
@@ -758,7 +756,7 @@ If Vx > Vy, then VF is set to 1, otherwise 0. Then Vy is subtracted from Vx, and
 */
 void Chip8::Fun_8xy5()
 {
-	printf("SUB V%X, V%X\n", m_decoder.x, m_decoder.y);
+	LOG("SUB V%X, V%X\n", m_decoder.x, m_decoder.y);
 	uint16_t result = m_V[m_decoder.x] - m_V[m_decoder.y];
 	uint8_t flag = (m_V[m_decoder.x] >= m_V[m_decoder.y]);
 
@@ -783,12 +781,12 @@ void Chip8::Fun_8xy6()
 {
 	if (!m_Shifting_quirk)
 	{
-		printf("SHR V%X, V%X\n", m_decoder.x, m_decoder.y);
+		LOG("SHR V%X, V%X\n", m_decoder.x, m_decoder.y);
 
 		m_V[m_decoder.x] = m_V[m_decoder.y];
 	}
 	else
-		printf("SHR V%X\n", m_decoder.x);
+		LOG("SHR V%X\n", m_decoder.x);
 
 	uint8_t flag = ((m_V[m_decoder.x] & 0x01) == 1);
 	m_V[m_decoder.x] /= 2;
@@ -803,7 +801,7 @@ If Vy > Vx, then VF is set to 1, otherwise 0. Then Vx is subtracted from Vy, and
 */
 void Chip8::Fun_8xy7()
 {
-	printf("SUBN V%X, V%X\n", m_decoder.x, m_decoder.y);
+	LOG("SUBN V%X, V%X\n", m_decoder.x, m_decoder.y);
 	uint16_t result = m_V[m_decoder.y] - m_V[m_decoder.x];
 	uint8_t flag = (m_V[m_decoder.y] >= m_V[m_decoder.x]);
 
@@ -829,12 +827,12 @@ void Chip8::Fun_8xyE()
 
 	if (!m_Shifting_quirk)
 	{
-		printf("SHL V%X, V%X\n", m_decoder.x, m_decoder.y);
+		LOG("SHL V%X, V%X\n", m_decoder.x, m_decoder.y);
 
 		m_V[m_decoder.x] = m_V[m_decoder.y];
 	}
 	else
-		printf("SHL V%X\n", m_decoder.x);
+		LOG("SHL V%X\n", m_decoder.x);
 
 	uint8_t flag = ((m_V[m_decoder.x] >> 7) == 1);
 	m_V[m_decoder.x] *= 2;
@@ -851,7 +849,7 @@ The values of Vx and Vy are compared, and if they are not equal, the program cou
 */
 void Chip8::Fun_9xy0()
 {
-	printf("SNE V%X, V%X\n", m_decoder.x, m_decoder.y);
+	LOG("SNE V%X, V%X\n", m_decoder.x, m_decoder.y);
 
 	if (m_V[m_decoder.x] != m_V[m_decoder.y])
 		m_pc += 2;
@@ -865,7 +863,7 @@ The value of register I is set to nnn.
 */
 void Chip8::Fun_Annn()
 {
-	printf("LD I, 0x%X\n", m_decoder.nnn);
+	LOG("LD I, 0x%X\n", m_decoder.nnn);
 
 	m_indexRegister = m_decoder.nnn;
 }
@@ -887,13 +885,13 @@ void Chip8::Fun_Bnnn()
 {
 	if (!m_Jumping_quirk)
 	{
-		printf("JP V0, 0x%X\n", m_decoder.nnn);
+		LOG("JP V0, 0x%X\n", m_decoder.nnn);
 
 		m_pc = m_decoder.nnn + m_V[0];
 	}
 	else
 	{
-		printf("JP V%X, 0x%X\n", m_decoder.x, m_decoder.nnn);
+		LOG("JP V%X, 0x%X\n", m_decoder.x, m_decoder.nnn);
 
 		m_pc = m_decoder.nnn + m_V[m_decoder.x];
 	}
@@ -908,7 +906,7 @@ The results are stored in Vx. See instruction 8xy2 for more information on AND.
 */
 void Chip8::Fun_Cxkk()
 {
-	printf("RND V%X, 0x%X\n", m_decoder.x, m_decoder.kk);
+	LOG("RND V%X, 0x%X\n", m_decoder.x, m_decoder.kk);
 
 	uint8_t random = std::rand() % 256;
 
@@ -927,7 +925,7 @@ See instruction 8xy3 for more information on XOR, and section 2.4, Display, for 
 */
 void Chip8::Fun_Dxyn()
 {
-	printf("DRW V%X, V%X, %X\n", m_decoder.x, m_decoder.y, m_decoder.n);
+	LOG("DRW V%X, V%X, %X\n", m_decoder.x, m_decoder.y, m_decoder.n);
 
 	uint8_t xPos = m_V[m_decoder.x];
 	uint8_t yPos = m_V[m_decoder.y];
@@ -1016,7 +1014,7 @@ Checks the keyboard, and if the key corresponding to the value of Vx is currentl
 */
 void Chip8::Fun_Ex9E()
 {
-	printf("SKP V%X\n", m_decoder.x);
+	LOG("SKP V%X\n", m_decoder.x);
 
 	if (m_keyboard.ReadKeyboard(m_V[m_decoder.x]))
 		m_pc += 2;
@@ -1030,7 +1028,7 @@ Checks the keyboard, and if the key corresponding to the value of Vx is currentl
 */
 void Chip8::Fun_ExA1()
 {
-	printf("SKNP V%X\n", m_decoder.x);
+	LOG("SKNP V%X\n", m_decoder.x);
 
 	if (!m_keyboard.ReadKeyboard(m_V[m_decoder.x]))
 		m_pc += 2;
@@ -1045,7 +1043,7 @@ void Chip8::Fun_F000()
 {
 	uint16_t word = Fetch(); // Get next 2 bytes to get the value of I and increment pc
 
-	printf("DW F000 %.4X\n", word);
+	LOG("DW F000 %.4X\n", word);
 
 	m_indexRegister = word;
 
@@ -1059,7 +1057,7 @@ Select bit planes to draw on when drawing with Dxy0/Dxyn.
 */
 void Chip8::Fun_Fx01()
 {
-	printf("DW #F%x01\n", m_decoder.x);
+	LOG("DW #F%x01\n", m_decoder.x);
 
 	m_display.SetActivePlane(m_decoder.x);
 }
@@ -1072,7 +1070,7 @@ The value of DT is placed into Vx.
 */
 void Chip8::Fun_Fx07()
 {
-	printf("LD V%X, DT\n", m_decoder.x);
+	LOG("LD V%X, DT\n", m_decoder.x);
 
 	m_V[m_decoder.x] = m_delayTimer;
 }
@@ -1085,13 +1083,13 @@ All execution stops until a key is pressed, then the value of that key is stored
 */
 void Chip8::Fun_Fx0A()
 {
-	//printf("LD V%X, K (Waiting for key press...)\n", m_decoder.x);
+	//LOG("LD V%X, K (Waiting for key press...)\n", m_decoder.x);
 
 	int key = -1;
 	if (m_keyboard.WaitForInput(&key))
 	{
 		m_V[m_decoder.x] = key;
-		printf("LD V%X, K (KeyPressed)\n", m_decoder.x);
+		LOG("LD V%X, K (KeyPressed)\n", m_decoder.x);
 	}
 	else
 		m_pc -= 2;
@@ -1105,7 +1103,7 @@ DT is set equal to the value of Vx.
 */
 void Chip8::Fun_Fx15()
 {
-	printf("LD DT, V%X\n", m_decoder.x);
+	LOG("LD DT, V%X\n", m_decoder.x);
 
 	m_delayTimer = m_V[m_decoder.x];
 }
@@ -1118,7 +1116,7 @@ ST is set equal to the value of Vx.
 */
 void Chip8::Fun_Fx18()
 {
-	printf("LD ST, V%X\n", m_decoder.x);
+	LOG("LD ST, V%X\n", m_decoder.x);
 
 	m_soundTimer = m_V[m_decoder.x];
 }
@@ -1131,7 +1129,7 @@ The values of I and Vx are added, and the results are stored in I.
 */
 void Chip8::Fun_Fx1E()
 {
-	printf("ADD I, V%X\n", m_decoder.x);
+	LOG("ADD I, V%X\n", m_decoder.x);
 
 	m_indexRegister += m_V[m_decoder.x];
 }
@@ -1144,7 +1142,7 @@ The value of I is set to the location for the hexadecimal sprite corresponding t
 */
 void Chip8::Fun_Fx29()
 {
-	printf("LD F, V%X\n", m_decoder.x);
+	LOG("LD F, V%X\n", m_decoder.x);
 
 	m_indexRegister = m_V[m_decoder.x] * 5; // The font sprites have a length of 5 bytes.
 }
@@ -1157,7 +1155,7 @@ The value of I is set to the location for the hexadecimal sprite corresponding t
 */
 void Chip8::Fun_Fx30()
 {
-	printf("LD F, V%X\n", m_decoder.x);
+	LOG("LD F, V%X\n", m_decoder.x);
 
 	m_indexRegister = m_V[m_decoder.x] * 10; // The font sprites have a length of 10 bytes.
 }
@@ -1170,7 +1168,7 @@ The interpreter takes the decimal value of Vx, and places the hundreds digit in 
 */
 void Chip8::Fun_Fx33()
 {
-	printf("LD B, V%X\n", m_decoder.x);
+	LOG("LD B, V%X\n", m_decoder.x);
 
 	uint8_t hundreds = m_V[m_decoder.x] / 100;
 	uint8_t tens = (m_V[m_decoder.x] % 100) / 10;
@@ -1202,14 +1200,14 @@ void Chip8::Fun_Fx55()
 {
 	if (m_Memory_quirk)
 	{
-		printf("LD [I], V%X\n", m_decoder.x);
+		LOG("LD [I], V%X\n", m_decoder.x);
 
 		for (uint8_t i = 0; i <= m_decoder.x; i++)
 			m_memory[m_indexRegister++] = m_V[i];
 	}
 	else
 	{
-		printf("LD [I], V%X\n", m_decoder.x);
+		LOG("LD [I], V%X\n", m_decoder.x);
 
 		for (uint8_t i = 0; i <= m_decoder.x; i++)
 			m_memory[m_indexRegister + i] = m_V[i];
@@ -1237,14 +1235,14 @@ void Chip8::Fun_Fx65()
 {
 	if (m_Memory_quirk)
 	{
-		printf("LD V%X, [I]\n", m_decoder.x);
+		LOG("LD V%X, [I]\n", m_decoder.x);
 
 		for (uint8_t i = 0; i <= m_decoder.x; i++)
 			m_V[i] = m_memory[m_indexRegister++];
 	}
 	else
 	{
-		printf("LD V%X, [I]\n", m_decoder.x);
+		LOG("LD V%X, [I]\n", m_decoder.x);
 
 		for (uint8_t i = 0; i <= m_decoder.x; i++)
 			m_V[i] = m_memory[m_indexRegister + i];

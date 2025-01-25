@@ -11,6 +11,7 @@
 #include "Display.h"
 #include "Keyboard.h"
 #include "Configuration.h"
+#include "Log.h"
 
 class Chip8
 {
