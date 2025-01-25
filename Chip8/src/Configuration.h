@@ -14,7 +14,7 @@ public:
 	int GetClippingQuirk() const;
 	int GetShiftingQuirk() const;
 	int GetJumpingQuirk() const;
-	int GetIPS() const;
+	int GetIPF() const;
 	unsigned int GetWindowWidth() const;
 	unsigned int GetWindowHeight() const;
 	unsigned int GetDisplayWidth() const;

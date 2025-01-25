@@ -4,6 +4,9 @@
 #include <string>
 #include <array>
 #include <cstdlib>
+#include <iostream>
+#include <chrono>
+#include <thread>
 
 #include "Display.h"
 #include "Keyboard.h"
@@ -76,12 +79,12 @@ private:
 	void Fun_Fx33(); // LD B, Vx
 	void Fun_Fx55(); // LD [I], Vx
 	void Fun_Fx65(); // LD Vx, [I]
-	void Fun_Fx75(); // LD R, VX
-	void Fun_Fx85(); // LD VX, R
+	void Fun_Fx75(); // LD R, VX XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+	void Fun_Fx85(); // LD VX, R XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 	
 private:
 	std::array<uint8_t, 16> m_V;
-	std::array<uint8_t, 0x1000> m_memory;
+	std::array<uint8_t, 0x10000> m_memory;
 
 
 	uint16_t m_indexRegister; // Only the lowest 12 bits are used. Points to locations in the memory (0x000 - 0xFFF)
@@ -122,7 +125,7 @@ private:
 	bool m_Shifting_quirk;
 	bool m_Jumping_quirk;
 
-	unsigned int m_ips;
+	unsigned int m_ipf;
 	unsigned int m_instructionCount;
 };
 

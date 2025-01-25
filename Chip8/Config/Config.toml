@@ -11,8 +11,8 @@ Clipping = -1
 Shifting = -1
 Jumping = -1
 
-[IPS]
-IPS = 20
+[IPF]
+IPF = 1000
 
 [Display]
 windowResolution = [640, 320]

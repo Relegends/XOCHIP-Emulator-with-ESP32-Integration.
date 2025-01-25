@@ -298,7 +298,7 @@ void Display::DrawPixel(unsigned int x, unsigned int y, bool planeLSB, bool plan
 	pixel.w = scaleX;
 	pixel.h = scaleY;
 
-	uint8_t pixelColor = (static_cast<uint8_t>(planeMSB) << 8) | static_cast<uint8_t>(planeLSB);
+	uint8_t pixelColor = (static_cast<uint8_t>(planeMSB) << 1) | static_cast<uint8_t>(planeLSB);
 	uint32_t selectedColor = 0;
 
 	switch (pixelColor)

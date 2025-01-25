@@ -75,9 +75,9 @@ int Configuration::GetJumpingQuirk() const
 	return value;
 }
 
-int Configuration::GetIPS() const
+int Configuration::GetIPF() const
 {
-	int value = m_config["IPS"]["IPS"].value_or(10);
+	int value = m_config["IPF"]["IPF"].value_or(10);
 
 	if (value < 7)
 		value = 7;
