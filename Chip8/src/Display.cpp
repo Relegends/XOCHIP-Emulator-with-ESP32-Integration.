@@ -408,13 +408,13 @@ bool Display::ChangePixelValue(unsigned int x, unsigned int y, unsigned int col,
 	{
 	case Display::LSB_PLANE:
 
-		conflict = (m_display[offset]); // If the pixel was alredy on --> CONFLICT
+		conflict = (m_display[offset] && value); // If the pixel was alredy on --> CONFLICT
 		m_display[offset] = (m_display[offset] ^ value); // Paint sprite with XOR
 
 		break;
 	case Display::MSB_PLANE:
 
-		conflict = (m_secondPlane[offset]); // If the pixel was alredy on --> CONFLICT
+		conflict = (m_secondPlane[offset] && value); // If the pixel was alredy on --> CONFLICT
 		m_secondPlane[offset] = (m_secondPlane[offset] ^ value); // Paint sprite with XOR
 
 		break;
@@ -423,11 +423,11 @@ bool Display::ChangePixelValue(unsigned int x, unsigned int y, unsigned int col,
 		switch (drawingPlaneOnBothMode)
 		{
 		case Display::LSB_PLANE:
-			conflict = (m_display[offset]); // If the pixel was alredy on --> CONFLICT
+			conflict = (m_display[offset] && value); // If the pixel was alredy on --> CONFLICT
 			m_display[offset] = (m_display[offset] ^ value); // Paint sprite with XOR
 			break;
 		case Display::MSB_PLANE:
-			conflict = (m_secondPlane[offset]); // If the pixel was alredy on --> CONFLICT
+			conflict = (m_secondPlane[offset] && value); // If the pixel was alredy on --> CONFLICT
 			m_secondPlane[offset] = (m_secondPlane[offset] ^ value); // Paint sprite with XOR
 			break;
 		default:
