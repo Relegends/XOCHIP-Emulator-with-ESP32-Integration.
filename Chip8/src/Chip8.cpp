@@ -15,7 +15,8 @@ Chip8::Chip8() :
 	m_decoder({ 0 }),
 	m_interpreter((Chip8::INTERPRETER)m_config.GetInterpretedMode()),
 	m_instructionCount(0),
-	m_ipf(m_config.GetIPF())
+	m_ipf(m_config.GetIPF()),
+	m_logggingMode((Chip8::LOGGINGMODE)m_config.GetLoggingMode())
 {
 	if (!m_display.Init()) exit(-1);
 	std::srand(static_cast<unsigned int>(std::time(0)));
@@ -241,9 +242,9 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 	m_decoder.n = opcode & 0x000F;
 	m_decoder.x = (opcode >> 8) & 0x000F;
 	m_decoder.y = (opcode >> 4) & 0x000F;
-	
 
-	if (m_decoder.kk != 0x0a)
+
+	if (m_decoder.kk != 0x0a && m_logggingMode != LOGGINGMODE::NONE)
 	{
 		LOG("I = 0x%.4X ", m_indexRegister);
 		for (uint8_t i = 0; i < m_V.size(); i++)
@@ -347,6 +348,8 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 		{
 		case 0x00:
 			return std::bind(&Chip8::Fun_F000, this);
+		case 0x02:
+			return std::bind(&Chip8::Fun_F002, this);
 		case 0x01:
 			return std::bind(&Chip8::Fun_Fx01, this);
 		case 0x07:
@@ -365,6 +368,8 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 			return std::bind(&Chip8::Fun_Fx30, this);
 		case 0x33:
 			return std::bind(&Chip8::Fun_Fx33, this);
+		case 0x3A:
+			return std::bind(&Chip8::Fun_Fx3A, this);
 		case 0x55:
 			return std::bind(&Chip8::Fun_Fx55, this);
 		case 0x65:
@@ -374,8 +379,23 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 	}
 
 	// If the opcode does not exit -> ERROR
-	LOG("ERROR: Decoded opcode not implemented! OPCODE: %.4X\n", opcode);
+	printf("ERROR: Decoded opcode not implemented! OPCODE: %.4X\n", opcode);
 	exit(-1);
+}
+
+void Chip8::SkipNextInstruction()
+{
+	if (m_interpreter != XOCHIP)
+		m_pc += 2;
+	else
+	{
+		uint16_t opcode = Fetch();
+		m_pc -= 2; //Fetch increments m_pc so it needs to get reset before updating it
+		if (opcode == 0XF000)
+			m_pc += 4;
+		else
+			m_pc += 2;
+	}
 }
 
 void Chip8::LoadGame(const std::string& gameName)
@@ -425,29 +445,30 @@ void Chip8::Run()
 		while (m_instructionCount < m_ipf)
 		{
 			m_keyboard.ProcessInput();
-			auto s  = std::chrono::high_resolution_clock::now();
+			auto s = std::chrono::high_resolution_clock::now();
 			Simulate_Cycle();
 			auto e = std::chrono::high_resolution_clock::now();
 			auto el = std::chrono::duration_cast<std::chrono::microseconds>(e - s);
-			LOG("Instruction executed in: %d us\n", el.count());
+			//LOG("Instruction executed in: %d us\n", el.count());
 
 			m_keyboard.SavePreviousInputs();
 			m_instructionCount++;
 		}
 		m_instructionCount = 0;
 
+		m_display.Update();
+
 		end = std::chrono::high_resolution_clock::now();
 
 		elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-		LOG_PRINT("Instructions executed: %d in %d us\n", 0, m_ipf, elapsedTime);
 
 		std::this_thread::sleep_for(thresholdCPU > elapsedTime ? (thresholdCPU - elapsedTime) : std::chrono::milliseconds(0));
+		LOG("Instructions executed: %d in %d us\n", m_ipf, elapsedTime);
 
 		if (m_delayTimer > 0)
 			m_delayTimer--;
-			
-		m_display.Update();
+
 
 	}
 }
@@ -458,7 +479,12 @@ Scroll display N lines down.
 */
 void Chip8::Fun_00Cn()
 {
-	LOG("SCD %d\n", m_decoder.n);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("SCD %d\n", m_decoder.n); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("scroll-down %d\n", m_decoder.n); break;
+	}
+
 	m_display.ScrollDown(m_decoder.n);
 }
 
@@ -468,7 +494,12 @@ Scroll display N lines up.
 */
 void Chip8::Fun_00Dn()
 {
-	LOG("SCU %d\n", m_decoder.n);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("SCU %d\n", m_decoder.n); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("scroll-up %d\n", m_decoder.n); break;
+	}
+
 	m_display.ScrollUp(m_decoder.n);
 }
 
@@ -478,7 +509,12 @@ Clear the display.
 */
 void Chip8::Fun_00E0()
 {
-	LOG("CLS\n");
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("CLS\n"); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("clear\n"); break;
+	}
+
 	m_display.CLS();
 }
 
@@ -491,7 +527,12 @@ The interpreter sets the program counter to the address at the top of the stack,
 */
 void Chip8::Fun_00EE()
 {
-	LOG("RET\n");
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("RET\n"); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("return\n"); break;
+	}
+
 	m_sp--;
 	m_pc = *m_sp;
 }
@@ -502,7 +543,12 @@ Scroll display 4 pixels to the right.
 */
 void Chip8::Fun_00FB()
 {
-	LOG("SCR\n");
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("SCR\n"); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("scroll-right\n"); break;
+	}
+
 	m_display.ScrollRight(4);
 }
 
@@ -512,7 +558,12 @@ Scroll display 4 pixels to the left.
 */
 void Chip8::Fun_00FC()
 {
-	LOG("SCL\n");
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("SCL\n"); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG:  LOG("scroll-left\n"); break;
+	}
+
 	m_display.ScrollLeft(4);
 }
 
@@ -522,7 +573,12 @@ Disable extended screen mode
 */
 void Chip8::Fun_00FE()
 {
-	LOG("LOW\n");
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LOW\n"); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG:  LOG("lores\n"); break;
+	}
+
 	m_display.SetExtendedMode(false);
 }
 
@@ -532,7 +588,12 @@ Enable extended screen mode
 */
 void Chip8::Fun_00FF()
 {
-	LOG("HIGH\n");
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("HIGH\n"); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("hires\n"); break;
+	}
+
 	m_display.SetExtendedMode(true);
 }
 
@@ -544,7 +605,12 @@ The interpreter sets the program counter to nnn.
 */
 void Chip8::Fun_1nnn()
 {
-	LOG("JP 0x%X\n", m_decoder.nnn);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("JP 0x%X\n", m_decoder.nnn); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("jump 0x%X\n", m_decoder.nnn); break;
+	}
+
 	m_pc = m_decoder.nnn;
 }
 
@@ -556,7 +622,12 @@ The interpreter increments the stack pointer, then puts the current PC on the to
 */
 void Chip8::Fun_2nnn()
 {
-	LOG("CALL 0x%X\n", m_decoder.nnn);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("CALL 0x%X\n", m_decoder.nnn); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG(":call 0x%X\n", m_decoder.nnn); break;
+	}
+
 	*m_sp = m_pc;
 	m_sp++;
 	m_pc = m_decoder.nnn;
@@ -570,9 +641,14 @@ The interpreter compares register Vx to kk, and if they are equal, increments th
 */
 void Chip8::Fun_3xkk()
 {
-	LOG("SE V%X, 0x%X\n", m_decoder.x, m_decoder.kk);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("SE V%X, 0x%X\n", m_decoder.x, m_decoder.kk); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("if v%X != %d then\n", m_decoder.x, m_decoder.kk); break;
+	}
+
 	if (m_V[m_decoder.x] == m_decoder.kk)
-		m_pc += 2;
+		SkipNextInstruction();
 }
 
 /*
@@ -583,9 +659,14 @@ The interpreter compares register Vx to kk, and if they are not equal, increment
 */
 void Chip8::Fun_4xkk()
 {
-	LOG("SNE V%X, 0x%X\n", m_decoder.x, m_decoder.kk);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("SNE V%X, 0x%X\n", m_decoder.x, m_decoder.kk); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("if v%X == %d then\n", m_decoder.x, m_decoder.kk); break;
+	}
+
 	if (m_V[m_decoder.x] != m_decoder.kk)
-		m_pc += 2;
+		SkipNextInstruction();
 }
 
 
@@ -597,9 +678,14 @@ The interpreter compares register Vx to register Vy, and if they are equal, incr
 */
 void Chip8::Fun_5xy0()
 {
-	LOG("SE V%X, V%X\n", m_decoder.x, m_decoder.y);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("SE V%X, V%X\n", m_decoder.x, m_decoder.y); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("if v%X != v%X then\n", m_decoder.x, m_decoder.y); break;
+	}
+
 	if (m_V[m_decoder.x] == m_V[m_decoder.y])
-		m_pc += 2;
+		SkipNextInstruction();
 }
 
 /*
@@ -609,7 +695,11 @@ Write registers Vx to Vy to memory pointed to by I.
 */
 void Chip8::Fun_5xy2()
 {
-	LOG("LD [I], V%X-V%X\n", m_decoder.x, m_decoder.y);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LD [I], V%X-V%X\n", m_decoder.x, m_decoder.y); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("save v%X - v%X\n", m_decoder.x, m_decoder.y); break;
+	}
 
 	uint8_t increment = 0;
 
@@ -627,7 +717,11 @@ Load registers Vx to Vy from memory pointed to by I.
 */
 void Chip8::Fun_5xy3()
 {
-	LOG("LD V%X-V%X, [I]\n", m_decoder.x, m_decoder.y);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LD V%X-V%X, [I]\n", m_decoder.x, m_decoder.y); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("load v%X - v%X\n", m_decoder.x, m_decoder.y); break;
+	}
 
 	uint8_t increment = 0;
 
@@ -646,7 +740,12 @@ The interpreter puts the value kk into register Vx.
 */
 void Chip8::Fun_6xkk()
 {
-	LOG("LD V%X, 0x%X\n", m_decoder.x, m_decoder.kk);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LD V%X, 0x%X\n", m_decoder.x, m_decoder.kk); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("v%X := %d\n", m_decoder.x, m_decoder.kk); break;
+	}
+
 	m_V[m_decoder.x] = m_decoder.kk;
 }
 
@@ -658,7 +757,12 @@ Adds the value kk to the value of register Vx, then stores the result in Vx.
 */
 void Chip8::Fun_7xkk()
 {
-	LOG("ADD V%X, 0x%X\n", m_decoder.x, m_decoder.kk);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("ADD V%X, 0x%X\n", m_decoder.x, m_decoder.kk); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("v%X += %d\n", m_decoder.x, m_decoder.kk); break;
+	}
+
 	m_V[m_decoder.x] += m_decoder.kk;
 }
 
@@ -670,7 +774,12 @@ Stores the value of register Vy in register Vx.
 */
 void Chip8::Fun_8xy0()
 {
-	LOG("LD V%X, V%X\n", m_decoder.x, m_decoder.y);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LD V%X, V%X\n", m_decoder.x, m_decoder.y); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("v%X := v%X\n", m_decoder.x, m_decoder.y); break;
+	}
+
 	m_V[m_decoder.x] = m_V[m_decoder.y];
 }
 
@@ -686,7 +795,12 @@ It also resets the flag register to zero IF VF reset quirk is on.
 */
 void Chip8::Fun_8xy1()
 {
-	LOG("OR V%X, V%X\n", m_decoder.x, m_decoder.y);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("OR V%X, V%X\n", m_decoder.x, m_decoder.y); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("v%X |= v%X\n", m_decoder.x, m_decoder.y); break;
+	}
+
 	m_V[m_decoder.x] |= m_V[m_decoder.y];
 
 	if (m_VFreset_quirk)
@@ -705,7 +819,12 @@ It also resets the flag register to zero IF VF reset quirk is on.
 */
 void Chip8::Fun_8xy2()
 {
-	LOG("AND V%X, V%X\n", m_decoder.x, m_decoder.y);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("AND V%X, V%X\n", m_decoder.x, m_decoder.y); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("v%X &= v%X\n", m_decoder.x, m_decoder.y); break;
+	}
+
 	m_V[m_decoder.x] &= m_V[m_decoder.y];
 
 	if (m_VFreset_quirk)
@@ -724,7 +843,12 @@ It also resets the flag register to zero IF VF reset quirk is on.
 */
 void Chip8::Fun_8xy3()
 {
-	LOG("XOR V%X, V%X\n", m_decoder.x, m_decoder.y);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("XOR V%X, V%X\n", m_decoder.x, m_decoder.y); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("v%X ^= v%X\n", m_decoder.x, m_decoder.y); break;
+	}
+
 	m_V[m_decoder.x] ^= m_V[m_decoder.y];
 
 	if (m_VFreset_quirk)
@@ -741,7 +865,12 @@ Only the lowest 8 bits of the result are kept, and stored in Vx.
 */
 void Chip8::Fun_8xy4()
 {
-	LOG("ADD V%X, V%X\n", m_decoder.x, m_decoder.y);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("ADD V%X, V%X\n", m_decoder.x, m_decoder.y); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("v%X += v%X\n", m_decoder.x, m_decoder.y); break;
+	}
+
 	uint16_t result = m_V[m_decoder.x] + m_V[m_decoder.y];
 	m_V[m_decoder.x] = result & 0x00FF;
 
@@ -756,7 +885,12 @@ If Vx > Vy, then VF is set to 1, otherwise 0. Then Vy is subtracted from Vx, and
 */
 void Chip8::Fun_8xy5()
 {
-	LOG("SUB V%X, V%X\n", m_decoder.x, m_decoder.y);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("SUB V%X, V%X\n", m_decoder.x, m_decoder.y); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("v%X -= v%X\n", m_decoder.x, m_decoder.y); break;
+	}
+
 	uint16_t result = m_V[m_decoder.x] - m_V[m_decoder.y];
 	uint8_t flag = (m_V[m_decoder.x] >= m_V[m_decoder.y]);
 
@@ -781,12 +915,22 @@ void Chip8::Fun_8xy6()
 {
 	if (!m_Shifting_quirk)
 	{
-		LOG("SHR V%X, V%X\n", m_decoder.x, m_decoder.y);
+		switch (m_logggingMode)
+		{
+		case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("SHR V%X, V%X\n", m_decoder.x, m_decoder.y); break;
+		case Chip8::LOGGINGMODE::OCTO_LOG: LOG("v%X >>= v%X\n", m_decoder.x, m_decoder.y); break;
+		}
 
 		m_V[m_decoder.x] = m_V[m_decoder.y];
 	}
 	else
-		LOG("SHR V%X\n", m_decoder.x);
+	{
+		switch (m_logggingMode)
+		{
+		case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("SHR V%X\n", m_decoder.x); break;
+		case Chip8::LOGGINGMODE::OCTO_LOG: LOG("v%X >>= v%X\n", m_decoder.x, m_decoder.y); break;
+		}
+	}
 
 	uint8_t flag = ((m_V[m_decoder.x] & 0x01) == 1);
 	m_V[m_decoder.x] /= 2;
@@ -801,7 +945,12 @@ If Vy > Vx, then VF is set to 1, otherwise 0. Then Vx is subtracted from Vy, and
 */
 void Chip8::Fun_8xy7()
 {
-	LOG("SUBN V%X, V%X\n", m_decoder.x, m_decoder.y);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("SUBN V%X, V%X\n", m_decoder.x, m_decoder.y); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("v%X =- v%X\n", m_decoder.x, m_decoder.y); break;
+	}
+
 	uint16_t result = m_V[m_decoder.y] - m_V[m_decoder.x];
 	uint8_t flag = (m_V[m_decoder.y] >= m_V[m_decoder.x]);
 
@@ -824,15 +973,24 @@ SHIFTING QUIRK INTERPRETATION:
 */
 void Chip8::Fun_8xyE()
 {
-
 	if (!m_Shifting_quirk)
 	{
-		LOG("SHL V%X, V%X\n", m_decoder.x, m_decoder.y);
+		switch (m_logggingMode)
+		{
+		case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("SHL V%X, V%X\n", m_decoder.x, m_decoder.y); break;
+		case Chip8::LOGGINGMODE::OCTO_LOG: LOG("v%X <<= v%X\n", m_decoder.x, m_decoder.y); break;
+		}
 
 		m_V[m_decoder.x] = m_V[m_decoder.y];
 	}
 	else
-		LOG("SHL V%X\n", m_decoder.x);
+	{
+		switch (m_logggingMode)
+		{
+		case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("SHL V%X\n", m_decoder.x); break;
+		case Chip8::LOGGINGMODE::OCTO_LOG: LOG("v%X <<= v%X\n", m_decoder.x, m_decoder.y); break;
+		}
+	}
 
 	uint8_t flag = ((m_V[m_decoder.x] >> 7) == 1);
 	m_V[m_decoder.x] *= 2;
@@ -849,10 +1007,14 @@ The values of Vx and Vy are compared, and if they are not equal, the program cou
 */
 void Chip8::Fun_9xy0()
 {
-	LOG("SNE V%X, V%X\n", m_decoder.x, m_decoder.y);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("SNE V%X, V%X\n", m_decoder.x, m_decoder.y); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("if v%X == v%X then\n", m_decoder.x, m_decoder.y); break;
+	}
 
 	if (m_V[m_decoder.x] != m_V[m_decoder.y])
-		m_pc += 2;
+		SkipNextInstruction();
 }
 
 /*
@@ -863,7 +1025,11 @@ The value of register I is set to nnn.
 */
 void Chip8::Fun_Annn()
 {
-	LOG("LD I, 0x%X\n", m_decoder.nnn);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LD I, 0x%X\n", m_decoder.nnn); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("i := 0x%X\n", m_decoder.nnn); break;
+	}
 
 	m_indexRegister = m_decoder.nnn;
 }
@@ -885,13 +1051,21 @@ void Chip8::Fun_Bnnn()
 {
 	if (!m_Jumping_quirk)
 	{
-		LOG("JP V0, 0x%X\n", m_decoder.nnn);
+		switch (m_logggingMode)
+		{
+		case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("JP V0, 0x%X\n", m_decoder.nnn); break;
+		case Chip8::LOGGINGMODE::OCTO_LOG: LOG("jump0 0x%X\n", m_decoder.nnn); break;
+		}
 
 		m_pc = m_decoder.nnn + m_V[0];
 	}
 	else
 	{
-		LOG("JP V%X, 0x%X\n", m_decoder.x, m_decoder.nnn);
+		switch (m_logggingMode)
+		{
+		case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("JP V%X, 0x%X\n", m_decoder.x, m_decoder.nnn); break;
+		case Chip8::LOGGINGMODE::OCTO_LOG: LOG("jump0 0x%X + v%X\n", m_decoder.nnn, m_decoder.x); break;
+		}
 
 		m_pc = m_decoder.nnn + m_V[m_decoder.x];
 	}
@@ -906,7 +1080,11 @@ The results are stored in Vx. See instruction 8xy2 for more information on AND.
 */
 void Chip8::Fun_Cxkk()
 {
-	LOG("RND V%X, 0x%X\n", m_decoder.x, m_decoder.kk);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("RND V%X, 0x%X\n", m_decoder.x, m_decoder.kk); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("v%X := random %d\n", m_decoder.x, m_decoder.kk); break;
+	}
 
 	uint8_t random = std::rand() % 256;
 
@@ -925,7 +1103,11 @@ See instruction 8xy3 for more information on XOR, and section 2.4, Display, for 
 */
 void Chip8::Fun_Dxyn()
 {
-	LOG("DRW V%X, V%X, %X\n", m_decoder.x, m_decoder.y, m_decoder.n);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("DRW V%X, V%X, %X\n", m_decoder.x, m_decoder.y, m_decoder.n); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("sprite v%X, v%X, %d\n", m_decoder.x, m_decoder.y, m_decoder.n); break;
+	}
 
 	uint8_t xPos = m_V[m_decoder.x];
 	uint8_t yPos = m_V[m_decoder.y];
@@ -1014,10 +1196,14 @@ Checks the keyboard, and if the key corresponding to the value of Vx is currentl
 */
 void Chip8::Fun_Ex9E()
 {
-	LOG("SKP V%X\n", m_decoder.x);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("SKP V%X\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("if v%X -key then\n", m_decoder.x); break;
+	}
 
 	if (m_keyboard.ReadKeyboard(m_V[m_decoder.x]))
-		m_pc += 2;
+		SkipNextInstruction();
 }
 
 /*
@@ -1028,10 +1214,14 @@ Checks the keyboard, and if the key corresponding to the value of Vx is currentl
 */
 void Chip8::Fun_ExA1()
 {
-	LOG("SKNP V%X\n", m_decoder.x);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("SKNP V%X\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("if v%X key then\n", m_decoder.x); break;
+	}
 
 	if (!m_keyboard.ReadKeyboard(m_V[m_decoder.x]))
-		m_pc += 2;
+		SkipNextInstruction();
 }
 
 /*
@@ -1043,7 +1233,11 @@ void Chip8::Fun_F000()
 {
 	uint16_t word = Fetch(); // Get next 2 bytes to get the value of I and increment pc
 
-	LOG("DW F000 %.4X\n", word);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("DW F000 %.4X\n", word); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("i := long %.4X\n", word); break;
+	}
 
 	m_indexRegister = word;
 
@@ -1057,9 +1251,25 @@ Select bit planes to draw on when drawing with Dxy0/Dxyn.
 */
 void Chip8::Fun_Fx01()
 {
-	LOG("DW #F%x01\n", m_decoder.x);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("DW #F%x01\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("plane %d\n", m_decoder.x); break;
+	}
 
 	m_display.SetActivePlane(m_decoder.x);
+}
+
+void Chip8::Fun_F002()
+{
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("DW #F002\n"); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("audio\n"); break;
+	}
+
+
+
 }
 
 /*
@@ -1070,7 +1280,11 @@ The value of DT is placed into Vx.
 */
 void Chip8::Fun_Fx07()
 {
-	LOG("LD V%X, DT\n", m_decoder.x);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LD V%X, DT\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("v%X := delay\n", m_decoder.x); break;
+	}
 
 	m_V[m_decoder.x] = m_delayTimer;
 }
@@ -1089,7 +1303,12 @@ void Chip8::Fun_Fx0A()
 	if (m_keyboard.WaitForInput(&key))
 	{
 		m_V[m_decoder.x] = key;
-		LOG("LD V%X, K (KeyPressed)\n", m_decoder.x);
+
+		switch (m_logggingMode)
+		{
+		case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LD V%X, K (KeyPressed)\n", m_decoder.x); break;
+		case Chip8::LOGGINGMODE::OCTO_LOG: LOG("v%X := key (KeyPressed)\n", m_decoder.x); break;
+		}
 	}
 	else
 		m_pc -= 2;
@@ -1103,7 +1322,11 @@ DT is set equal to the value of Vx.
 */
 void Chip8::Fun_Fx15()
 {
-	LOG("LD DT, V%X\n", m_decoder.x);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LD DT, V%X\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("delay := v%X\n", m_decoder.x); break;
+	}
 
 	m_delayTimer = m_V[m_decoder.x];
 }
@@ -1116,7 +1339,11 @@ ST is set equal to the value of Vx.
 */
 void Chip8::Fun_Fx18()
 {
-	LOG("LD ST, V%X\n", m_decoder.x);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LD ST, V%X\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("buzzer v%X\n", m_decoder.x); break;
+	}
 
 	m_soundTimer = m_V[m_decoder.x];
 }
@@ -1129,7 +1356,11 @@ The values of I and Vx are added, and the results are stored in I.
 */
 void Chip8::Fun_Fx1E()
 {
-	LOG("ADD I, V%X\n", m_decoder.x);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("ADD I, V%X\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("i += v%X\n", m_decoder.x); break;
+	}
 
 	m_indexRegister += m_V[m_decoder.x];
 }
@@ -1142,22 +1373,40 @@ The value of I is set to the location for the hexadecimal sprite corresponding t
 */
 void Chip8::Fun_Fx29()
 {
-	LOG("LD F, V%X\n", m_decoder.x);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LD LF, V%X\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("i := hex v%X\n", m_decoder.x); break;
+	}
 
 	m_indexRegister = m_V[m_decoder.x] * 5; // The font sprites have a length of 5 bytes.
 }
 
 /*
-Fx30 - LD F, Vx
+Fx30 - LD H, Vx
 HIRES FONT: Set I = location of sprite for digit Vx.
 
 The value of I is set to the location for the hexadecimal sprite corresponding to the value of Vx.
 */
 void Chip8::Fun_Fx30()
 {
-	LOG("LD F, V%X\n", m_decoder.x);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LD HF, V%X\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("i := bighex v%X\n", m_decoder.x); break;
+	}
 
 	m_indexRegister = m_V[m_decoder.x] * 10; // The font sprites have a length of 10 bytes.
+}
+
+void Chip8::Fun_Fx3A()
+{
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("DW #F%X3A\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("pitch := v%X\n", m_decoder.x); break;
+	}
+
 }
 
 /*
@@ -1168,7 +1417,11 @@ The interpreter takes the decimal value of Vx, and places the hundreds digit in 
 */
 void Chip8::Fun_Fx33()
 {
-	LOG("LD B, V%X\n", m_decoder.x);
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LD B, V%X\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("bcd v%X\n", m_decoder.x); break;
+	}
 
 	uint8_t hundreds = m_V[m_decoder.x] / 100;
 	uint8_t tens = (m_V[m_decoder.x] % 100) / 10;
@@ -1198,17 +1451,19 @@ WITHOUT MEMORY QUIRK INTERPRETATION:
 */
 void Chip8::Fun_Fx55()
 {
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LD [I], V%X\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("save v%X\n", m_decoder.x); break;
+	}
+
 	if (m_Memory_quirk)
 	{
-		LOG("LD [I], V%X\n", m_decoder.x);
-
 		for (uint8_t i = 0; i <= m_decoder.x; i++)
 			m_memory[m_indexRegister++] = m_V[i];
 	}
 	else
 	{
-		LOG("LD [I], V%X\n", m_decoder.x);
-
 		for (uint8_t i = 0; i <= m_decoder.x; i++)
 			m_memory[m_indexRegister + i] = m_V[i];
 	}
@@ -1233,17 +1488,19 @@ WITHOUT MEMORY QUIRK INTERPRETATION:
 */
 void Chip8::Fun_Fx65()
 {
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LD V%X, [I]\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("load v%X\n", m_decoder.x); break;
+	}
+
 	if (m_Memory_quirk)
 	{
-		LOG("LD V%X, [I]\n", m_decoder.x);
-
 		for (uint8_t i = 0; i <= m_decoder.x; i++)
 			m_V[i] = m_memory[m_indexRegister++];
 	}
 	else
 	{
-		LOG("LD V%X, [I]\n", m_decoder.x);
-
 		for (uint8_t i = 0; i <= m_decoder.x; i++)
 			m_V[i] = m_memory[m_indexRegister + i];
 	}
@@ -1255,6 +1512,12 @@ void Chip8::Fun_Fx65()
 */
 void Chip8::Fun_Fx75()
 {
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LD r, V%X\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("saveflags v%X\n", m_decoder.x); break;
+	}
+
 
 }
 
@@ -1264,4 +1527,11 @@ void Chip8::Fun_Fx75()
 */
 void Chip8::Fun_Fx85()
 {
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("LD V%X, r\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("loadflags v%X\n", m_decoder.x); break;
+	}
+
+
 }

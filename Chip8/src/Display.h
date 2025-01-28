@@ -33,8 +33,6 @@ public:
 	void ScrollRight(const unsigned int lines);
 	void ScrollLeft(const unsigned int lines);
 
-	void Render();
-
 	void SetExtendedMode(const bool enable);
 	const bool GetExtendedMode() const;
 	
@@ -46,7 +44,7 @@ public:
 	bool IsWindowClose() const;
 
 private:
-
+	void Render();
 	void DrawPixel(unsigned int x, unsigned int y, bool planeLSB, bool planeMSB);
 
 private:

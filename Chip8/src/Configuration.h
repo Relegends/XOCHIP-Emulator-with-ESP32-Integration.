@@ -7,6 +7,7 @@ class Configuration
 public:
 	Configuration(std::string configPath);
 
+	unsigned int GetLoggingMode() const;
 	unsigned int GetInterpretedMode() const;
 	int GetVFresetQuirk() const;
 	int GetMemoryQuirk() const;

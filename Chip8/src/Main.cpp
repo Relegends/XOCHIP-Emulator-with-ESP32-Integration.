@@ -12,8 +12,6 @@ int main(int argc, char* argv[])
 
 	std::string romFile = argv[1];
 
-	//const std::string romFile = "./testRoms/2-ibm-logo.ch8";
-
 	Chip8 emulator;
 
 	emulator.LoadGame(romFile);

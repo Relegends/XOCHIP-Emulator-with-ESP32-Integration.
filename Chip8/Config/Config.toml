@@ -1,3 +1,7 @@
+#Logging: 0 = No Logging * 1 = Chip8 Logging * 2 = Octo Logging
+[Logging]
+Log = 0
+
 # Interpreter: VIP = 0 * SCHIP = 1 * OCTO = 2 * XOChip = 3
 [InterpreterMode]
 interpreter = 3

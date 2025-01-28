@@ -5,6 +5,16 @@ Configuration::Configuration(std::string configPath)
 	m_config = toml::parse_file(configPath);
 }
 
+unsigned int Configuration::GetLoggingMode() const
+{
+	unsigned int value = m_config["Logging"]["Log"].value_or(0);
+
+	if (value < 0 || value > 2)
+		value = 0;
+
+	return value;
+}
+
 unsigned int Configuration::GetInterpretedMode() const
 {
 	unsigned int value = m_config["InterpreterMode"]["interpreter"].value_or(0);

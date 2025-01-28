@@ -35,6 +35,8 @@ private:
 	uint16_t Fetch();
 	std::function<void()> Decode(uint16_t opcode);
 
+	void SkipNextInstruction();
+
 	void Fun_00Cn(); // SCD N
 	void Fun_00Dn(); // SCD U
 	void Fun_00E0(); // CLS
@@ -70,13 +72,15 @@ private:
 	void Fun_ExA1(); // SKNP Vx
 	void Fun_F000(); // DW #F000, #NNNN
 	void Fun_Fx01(); // DW #Fx01
+	void Fun_F002(); // DW #F002 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 	void Fun_Fx07(); // LD Vx, DT
 	void Fun_Fx0A(); // LD Vx, K
 	void Fun_Fx15(); // LD DT, Vx
 	void Fun_Fx18(); // LD ST, Vx
 	void Fun_Fx1E(); // ADD I, Vx
-	void Fun_Fx29(); // LD F, Vx
-	void Fun_Fx30(); // LD F, Vx
+	void Fun_Fx29(); // LD LF, Vx
+	void Fun_Fx30(); // LD HF, Vx
+	void Fun_Fx3A(); // DW #Fx3A XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 	void Fun_Fx33(); // LD B, Vx
 	void Fun_Fx55(); // LD [I], Vx
 	void Fun_Fx65(); // LD Vx, [I]
@@ -128,5 +132,12 @@ private:
 
 	unsigned int m_ipf;
 	unsigned int m_instructionCount;
+
+	enum LOGGINGMODE
+	{
+		NONE = 0,
+		CHIP8_LOG,
+		OCTO_LOG
+	} m_logggingMode;
 };
 
