@@ -21,10 +21,7 @@ IPF = 1000
 [Display]
 windowResolution = [640, 320]
 displayResolution = [64, 32]
-backgroundColor = 0x996600FF
-foreground1Color = 0xffcc00FF
-foreground2Color = 0xFF6600FF
-blendedColor = 0x662200FF
+
 
 [Keyboard]
 1 = ["1", 1	]

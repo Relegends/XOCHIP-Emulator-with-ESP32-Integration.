@@ -46,7 +46,8 @@ public:
 private:
 	void Render();
 	void DrawPixel(unsigned int x, unsigned int y, bool planeLSB, bool planeMSB);
-
+	void DrawPixelToCombineBuffer(unsigned int x, unsigned int y, bool planeLSB, bool planeMSB);
+	void UpdateTexture();
 private:
 	unsigned int m_windowHeight;
 	unsigned int m_windowWidth;
@@ -67,9 +68,15 @@ private:
 
 	std::vector<bool> m_display;
 	std::vector<bool> m_secondPlane;
+	std::vector<uint32_t> m_combineBuffer;
 
 	std::unique_ptr < SDL_Window, std::function<void(SDL_Window*)>> m_window;
 	std::unique_ptr<SDL_Renderer, std::function<void(SDL_Renderer*)>> m_renderer;
+
+	std::unique_ptr<SDL_Texture, std::function<void(SDL_Texture*)>> m_texture;
+
+	SDL_Rect m_rectTexture;
+	SDL_Rect m_rectWindow;
 
 	enum ACTIVEPLANE m_activePlane;
 
