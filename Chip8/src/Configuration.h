@@ -24,6 +24,9 @@ public:
 	uint32_t GetDisplayForeground_1Color() const;
 	uint32_t GetDisplayForeground_2Color() const;
 	uint32_t GetDisplayBlendedColor() const;
+	unsigned int GetAudioFrequency() const;
+	unsigned int GetAudioSampleRate() const;
+	unsigned int GetAudioVolume() const;
 
 	std::vector<std::pair<std::string, int>> GetInputMap() const;
 

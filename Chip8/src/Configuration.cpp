@@ -135,6 +135,21 @@ uint32_t Configuration::GetDisplayBlendedColor() const
 	return m_config["Display"]["blendedColor"].value_or<uint32_t>(0x662200);
 }
 
+unsigned int Configuration::GetAudioFrequency() const
+{
+	return m_config["Audio"]["frequency"].value_or(440);
+}
+
+unsigned int Configuration::GetAudioSampleRate() const
+{
+	return m_config["Audio"]["sampleRate"].value_or(512);
+}
+
+unsigned int Configuration::GetAudioVolume() const
+{
+	return m_config["Audio"]["volume"].value_or(3000);
+}
+
 std::vector<std::pair<std::string, int>> Configuration::GetInputMap() const
 {
 	auto tbl = m_config["Keyboard"].as_table();

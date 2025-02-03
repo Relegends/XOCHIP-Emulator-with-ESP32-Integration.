@@ -9,6 +9,7 @@
 #include <thread>
 
 #include "Display.h"
+#include "Audio.h"
 #include "Keyboard.h"
 #include "Configuration.h"
 #include "Log.h"
@@ -31,6 +32,8 @@ private:
 
 	void InitQuirks();
 	void UpdateQuirk(bool& quirkMember, const int configValue);
+
+	void UpdateTimers();
 
 	uint16_t Fetch();
 	std::function<void()> Decode(uint16_t opcode);
@@ -104,6 +107,7 @@ private:
 	Configuration m_config;	
 	Display m_display;
 	Keyboard m_keyboard;
+	Audio m_audio;
 
 	struct OPCODE_DECO
 	{

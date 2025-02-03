@@ -11,6 +11,7 @@ Chip8::Chip8() :
 		m_config.GetDisplayWidth(), m_config.GetDisplayHeight(),
 		m_config.GetDisplayBackgroundColor(), m_config.GetDisplayForeground_1Color(),
 		m_config.GetDisplayForeground_2Color(), m_config.GetDisplayBlendedColor()),
+	m_audio(m_config.GetAudioFrequency(), m_config.GetAudioSampleRate(), m_config.GetAudioVolume()),
 	m_keyboard({ m_config.GetInputMap() }),
 	m_decoder({ 0 }),
 	m_interpreter((Chip8::INTERPRETER)m_config.GetInterpretedMode()),
@@ -19,6 +20,7 @@ Chip8::Chip8() :
 	m_logggingMode((Chip8::LOGGINGMODE)m_config.GetLoggingMode())
 {
 	if (!m_display.Init()) exit(-1);
+	if (!m_audio.Init()) exit(-1);
 	std::srand(static_cast<unsigned int>(std::time(0)));
 
 	InitQuirks();
@@ -458,19 +460,29 @@ void Chip8::Run()
 
 		m_display.Update();
 
+		UpdateTimers();
+
 		end = std::chrono::high_resolution_clock::now();
 
 		elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-
 		std::this_thread::sleep_for(thresholdCPU > elapsedTime ? (thresholdCPU - elapsedTime) : std::chrono::milliseconds(0));
 		LOG("Instructions executed: %d in %d us\n", m_ipf, elapsedTime);
-
-		if (m_delayTimer > 0)
-			m_delayTimer--;
-
-
 	}
+}
+
+void Chip8::UpdateTimers()
+{
+	if (m_delayTimer > 0)
+		m_delayTimer--;
+
+	if (m_soundTimer > 0)
+	{
+		m_audio.PlaySound(true);
+		m_soundTimer--;
+	}
+	else
+		m_audio.PlaySound(false);
 }
 
 /*
