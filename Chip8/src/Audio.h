@@ -1,5 +1,7 @@
 #pragma once
 #include <string>
+#include <vector>
+#include <cmath>
 #include "SDL.h"
 
 class Audio
@@ -12,8 +14,13 @@ public:
 
 	void PlaySound(bool on);
 
+	void SetPitch(const uint8_t value);
+	void LoadPatternBuffer(const uint8_t* source);
+
 private:
 	static void SquareWaveCallback(void* userdata, uint8_t* stream, int len);
+
+	static void XOChipAudioCallback(void* userdata, uint8_t* stream, int len);
 
 private:
 	SDL_AudioSpec m_audioSpec;
@@ -25,6 +32,9 @@ private:
 	unsigned int m_sampleRate;
 	int m_volume;
 
-	uint32_t m_runningSampleIndex;
+	uint8_t m_pitch;
+	std::vector<uint8_t> m_patternBuffer;
+
+	float m_runningSampleIndex;
 };
 

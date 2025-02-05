@@ -4,7 +4,7 @@ Log = 0
 
 # Interpreter: VIP = 0 * SCHIP = 1 * OCTO = 2 * XOChip = 3
 [InterpreterMode]
-interpreter = 0
+interpreter = 3
 
 #Quirks Values: -1 = Default by Interpreter, 0 = OFF, 1 = 0N 
 [Quirks]

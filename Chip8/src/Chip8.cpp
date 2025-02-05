@@ -444,19 +444,23 @@ void Chip8::Run()
 
 		start = std::chrono::high_resolution_clock::now();
 
+		m_keyboard.ProcessInput();
+
+
 		while (m_instructionCount < m_ipf)
 		{
-			m_keyboard.ProcessInput();
-			auto s = std::chrono::high_resolution_clock::now();
+			//auto s = std::chrono::high_resolution_clock::now();
 			Simulate_Cycle();
-			auto e = std::chrono::high_resolution_clock::now();
-			auto el = std::chrono::duration_cast<std::chrono::microseconds>(e - s);
+			//auto e = std::chrono::high_resolution_clock::now();
+			//auto el = std::chrono::duration_cast<std::chrono::microseconds>(e - s);
 			//LOG("Instruction executed in: %d us\n", el.count());
 
-			m_keyboard.SavePreviousInputs();
+			
 			m_instructionCount++;
 		}
 		m_instructionCount = 0;
+
+		m_keyboard.SavePreviousInputs();
 
 		m_display.Update();
 
@@ -467,8 +471,10 @@ void Chip8::Run()
 		elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
 		std::this_thread::sleep_for(thresholdCPU > elapsedTime ? (thresholdCPU - elapsedTime) : std::chrono::milliseconds(0));
-		LOG("Instructions executed: %d in %d us\n", m_ipf, elapsedTime);
+		printf("Instructions executed: %d in %d us\n", m_ipf, elapsedTime);
 	}
+
+	m_audio.Close();
 }
 
 void Chip8::UpdateTimers()
@@ -1272,6 +1278,10 @@ void Chip8::Fun_Fx01()
 	m_display.SetActivePlane(m_decoder.x);
 }
 
+/*
+FX02 - DW #Fx02
+Load 16 bytes audio pattern pointed to by I into audio pattern buffer.
+*/
 void Chip8::Fun_F002()
 {
 	switch (m_logggingMode)
@@ -1280,8 +1290,7 @@ void Chip8::Fun_F002()
 	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("audio\n"); break;
 	}
 
-
-
+	m_audio.LoadPatternBuffer(&m_memory[m_indexRegister]);
 }
 
 /*
@@ -1411,6 +1420,10 @@ void Chip8::Fun_Fx30()
 	m_indexRegister = m_V[m_decoder.x] * 10; // The font sprites have a length of 10 bytes.
 }
 
+/*
+Fx3A - DW #Fx3A
+Set audio pitch for a audio pattern playback rate of 4000*2^((vX-64)/48)Hz.
+*/
 void Chip8::Fun_Fx3A()
 {
 	switch (m_logggingMode)
@@ -1419,6 +1432,7 @@ void Chip8::Fun_Fx3A()
 	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("pitch := v%X\n", m_decoder.x); break;
 	}
 
+	m_audio.SetPitch(m_V[m_decoder.x]);
 }
 
 /*
