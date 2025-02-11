@@ -2,6 +2,7 @@
 
 Configuration::Configuration(std::string configPath)
 {
+	m_filePath = configPath;
 	m_config = toml::parse_file(configPath);
 }
 
@@ -178,3 +179,39 @@ std::vector<std::pair<std::string, int>> Configuration::GetInputMap() const
 	return vec;
 }
 
+std::vector<int> Configuration::GetRPLUserFlags() const
+{
+	auto flagsArray = m_config["UserFlags"]["userFlags"].as_array();
+	std::vector<int> returnVector;
+	if (flagsArray)
+	{
+		flagsArray->for_each([&returnVector](const toml::node& flag)
+			{
+				if (flag.is_integer())
+					returnVector.push_back(flag.as_integer()->get());
+			});
+	}
+	return returnVector;
+}
+
+void Configuration::SetRPLUserFlags(const std::vector<int>& updatedFlags)
+{
+	toml::array* flagsArray = m_config["UserFlags"]["userFlags"].as_array();
+	flagsArray->clear();
+	for (const int& flag : updatedFlags)
+		flagsArray->push_back(flag);
+
+	UpdateConfigFile();
+}
+
+void Configuration::UpdateConfigFile()
+{
+	std::ofstream file(m_filePath);
+	if (!file.is_open())
+	{
+		std::cerr << "Error opening config file!\n";
+		exit(-1);
+	}
+	file << m_config;
+	file.close();
+}

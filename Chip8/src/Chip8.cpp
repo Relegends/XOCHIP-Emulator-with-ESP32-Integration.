@@ -376,6 +376,10 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 			return std::bind(&Chip8::Fun_Fx55, this);
 		case 0x65:
 			return std::bind(&Chip8::Fun_Fx65, this);
+		case 0x75:
+			return std::bind(&Chip8::Fun_Fx75, this);
+		case 0x85:
+			return std::bind(&Chip8::Fun_Fx85, this);
 		}
 		break;
 	}
@@ -439,9 +443,10 @@ void Chip8::Run()
 	std::chrono::microseconds elapsedTime{ 0 };
 	std::chrono::microseconds thresholdCPU{ 16667 }; // 16.67 ms
 
+	std::chrono::high_resolution_clock::time_point nextFrameTime = std::chrono::high_resolution_clock::now();
+
 	while (!m_display.IsWindowClose())
 	{
-
 		start = std::chrono::high_resolution_clock::now();
 
 		m_keyboard.ProcessInput();
@@ -466,12 +471,16 @@ void Chip8::Run()
 
 		UpdateTimers();
 
-		end = std::chrono::high_resolution_clock::now();
+		// Calculate the time for the next frame
+		nextFrameTime += thresholdCPU;
 
-		elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+		// Sleep until the next frame time
+		std::this_thread::sleep_until(nextFrameTime);
 
-		std::this_thread::sleep_for(thresholdCPU > elapsedTime ? (thresholdCPU - elapsedTime) : std::chrono::milliseconds(0));
-		printf("Instructions executed: %d in %d us\n", m_ipf, elapsedTime);
+		// Calculate and log the elapsed time for debugging
+		auto end = std::chrono::high_resolution_clock::now();
+		auto elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+		std::cout << "Total frame time: " << elapsedTime.count() << " us" << std::endl;
 	}
 
 	m_audio.Close();
@@ -484,8 +493,9 @@ void Chip8::UpdateTimers()
 
 	if (m_soundTimer > 0)
 	{
-		m_audio.PlaySound(true);
 		m_soundTimer--;
+		m_audio.GenerateAudioSamples();
+		m_audio.PlaySound(true);
 	}
 	else
 		m_audio.PlaySound(false);
@@ -1534,7 +1544,7 @@ void Chip8::Fun_Fx65()
 
 /*
 	Fx75 - LD R, VX
-	Store V0 through VX to HP-48 RPL user flags (X <= 7).
+	Store V0 through VX to HP-48 RPL user flags (X <= 7 in SCHIP).
 */
 void Chip8::Fun_Fx75()
 {
@@ -1544,12 +1554,30 @@ void Chip8::Fun_Fx75()
 	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("saveflags v%X\n", m_decoder.x); break;
 	}
 
+	std::vector<int> flags;
 
+	switch (m_interpreter)
+	{
+	case Chip8::SCHIP:
+		for (uint8_t i = 0; i <= 7; i++)
+			flags.push_back(m_V[i]);
+		break;
+	case Chip8::OCTO:
+	case Chip8::XOCHIP:
+		for (uint8_t i = 0; i < 16; i++)
+			flags.push_back(m_V[i]);
+		break;
+	default:
+		std::exit(-1);
+		break;
+	}
+
+	m_config.SetRPLUserFlags(flags);
 }
 
 /*
 	Fx85 - LD VX, R
-	Read V0 through VX to HP-48 RPL user flags (X <= 7).
+	Read V0 through VX to HP-48 RPL user flags (X <= 7 in SCHIP).
 */
 void Chip8::Fun_Fx85()
 {
@@ -1559,5 +1587,21 @@ void Chip8::Fun_Fx85()
 	case Chip8::LOGGINGMODE::OCTO_LOG: LOG("loadflags v%X\n", m_decoder.x); break;
 	}
 
+	std::vector<int> flags = m_config.GetRPLUserFlags();
 
+	switch (m_interpreter)
+	{
+	case Chip8::SCHIP:
+		for (uint8_t i = 0; i <= 7; i++)
+			m_V[i] = flags[i];
+		break;
+	case Chip8::OCTO:
+	case Chip8::XOCHIP:
+		for (uint8_t i = 0; i < 16; i++)
+			m_V[i] = flags[i];
+		break;
+	default:
+		std::exit(-1);
+		break;
+	}
 }

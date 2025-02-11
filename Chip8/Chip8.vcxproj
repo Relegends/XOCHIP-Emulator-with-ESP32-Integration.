@@ -152,6 +152,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="src\RingBuffer.h" />
     <ClInclude Include="src\Audio.h" />
     <ClInclude Include="src\Log.h" />
     <ClInclude Include="src\Chip8.h" />
@@ -160,6 +161,7 @@
     <ClInclude Include="src\Keyboard.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\RingBuffer.cpp" />
     <ClCompile Include="src\Audio.cpp" />
     <ClCompile Include="src\Log.cpp" />
     <ClCompile Include="src\Chip8.cpp" />

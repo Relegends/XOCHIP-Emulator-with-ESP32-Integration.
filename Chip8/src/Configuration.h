@@ -1,6 +1,7 @@
 #pragma once
 #include <toml.hpp>
 #include <vector>
+#include <iostream>
 
 class Configuration
 {
@@ -30,7 +31,14 @@ public:
 
 	std::vector<std::pair<std::string, int>> GetInputMap() const;
 
+	std::vector<int> GetRPLUserFlags() const;
+	void SetRPLUserFlags(const std::vector<int>& updatedFlags);
+
+private:
+	void UpdateConfigFile();
+
 private:
 	toml::parse_result m_config;
+	std::string m_filePath;
 };
 

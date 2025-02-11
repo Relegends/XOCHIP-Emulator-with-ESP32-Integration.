@@ -1,46 +1,46 @@
-#Logging: 0 = No Logging * 1 = Chip8 Logging * 2 = Octo Logging
-[Logging]
-Log = 0
-
-# Interpreter: VIP = 0 * SCHIP = 1 * OCTO = 2 * XOChip = 3
-[InterpreterMode]
-interpreter = 3
-
-#Quirks Values: -1 = Default by Interpreter, 0 = OFF, 1 = 0N 
-[Quirks]
-VFreset = -1
-Memory = -1
-DisplayWait = -1
-Clipping = -1
-Shifting = -1
-Jumping = -1
-
-[IPF]
-IPF = 1000
-
-[Display]
-windowResolution = [640, 320]
-displayResolution = [64, 32]
-
 [Audio]
 frequency = 440
 sampleRate = 44100
 volume = 3000
 
+[Display]
+displayResolution = [ 64, 32 ]
+windowResolution = [ 640, 320 ]
+
+[IPF]
+IPF = 1000
+
+[InterpreterMode]
+interpreter = 3
+
 [Keyboard]
-1 = ["1", 1	]
-2 = ["2", 2	]
-3 = ["3", 3	]
-C = ["4", 12]
-4 = ["Q", 4	]
-5 = ["W", 5	]
-6 = ["E", 6	]
-D = ["R", 13]
-7 = ["A", 7	]
-8 = ["S", 8	]
-9 = ["D", 9 ]
-E = ["F", 14]
-A = ["Z", 10]
-0 = ["X", 0 ]
-B = ["C", 11]
-F = ["V", 15] 
+0 = [ 'X', 0 ]
+1 = [ '1', 1 ]
+2 = [ '2', 2 ]
+3 = [ '3', 3 ]
+4 = [ 'Q', 4 ]
+5 = [ 'W', 5 ]
+6 = [ 'E', 6 ]
+7 = [ 'A', 7 ]
+8 = [ 'S', 8 ]
+9 = [ 'D', 9 ]
+A = [ 'Z', 10 ]
+B = [ 'C', 11 ]
+C = [ '4', 12 ]
+D = [ 'R', 13 ]
+E = [ 'F', 14 ]
+F = [ 'V', 15 ]
+
+[Logging]
+Log = 0
+
+[Quirks]
+Clipping = -1
+DisplayWait = -1
+Jumping = -1
+Memory = -1
+Shifting = -1
+VFreset = -1
+
+[UserFlags]
+userFlags = [ 0, 0, 3, 0, 3, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0 ]
