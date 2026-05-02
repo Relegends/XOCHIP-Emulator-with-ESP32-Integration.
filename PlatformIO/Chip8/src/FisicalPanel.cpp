@@ -18,7 +18,7 @@ FisicalPanel::FisicalPanel(const unsigned int panelWidth, const unsigned int pan
 
     auto panelConfig = m_panel.config();
     panelConfig.panel_width = panelWidth;               // 320 pixel
-    panelConfig.panel_height = panelHeight;             // 420 pixel
+    panelConfig.panel_height = panelHeight;             // 240 pixel
     panelConfig.pin_cs = 5;                             // GPIO 5. CS (Chip Select). 
     panelConfig.pin_rst = 4;                            // GPIO 4. RST (Display reset).
     panelConfig.offset_x = panelConfig.offset_y = 0;    // NOT OFFSET. Full Screen mode.
