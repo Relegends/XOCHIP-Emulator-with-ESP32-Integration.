@@ -5,7 +5,8 @@ Display::Display(const std::string& name,
 	const unsigned int windowWidth, const unsigned int windowHeight,
 	const unsigned int displayWidth, const unsigned int displayHeight,
 	const uint32_t backgroundColor, const uint32_t foreground1Color,
-	const uint32_t foreground2Color, const uint32_t blendedColor)
+	const uint32_t foreground2Color, const uint32_t blendedColor) :
+	m_panel({windowWidth, windowHeight})
 {
 	m_windowName = name;
 	m_windowWidth = windowWidth;
@@ -29,46 +30,15 @@ Display::Display(const std::string& name,
 
 bool Display::Init()
 {
-	if (SDL_Init(SDL_INIT_VIDEO) < 0)
+	if (!m_panel.init())
 	{
-		std::cout << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
+		LOG("ERROR! Panel init went wrong!");
 		return false;
 	}
-
-	m_window = std::unique_ptr<SDL_Window, std::function<void(SDL_Window*)>>(
-		SDL_CreateWindow(m_windowName.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, m_windowWidth, m_windowHeight, SDL_WINDOW_SHOWN),
-		SDL_DestroyWindow
-	);
-
-	if (m_window == nullptr)
-	{
-		std::cout << "Window could not be created! SDL_Error: " << SDL_GetError() << std::endl;
-		return false;
-	}
-
-	m_renderer = std::unique_ptr<SDL_Renderer, std::function<void(SDL_Renderer*)>>(
-		SDL_CreateRenderer(m_window.get(), NULL, SDL_RENDERER_ACCELERATED),
-		SDL_DestroyRenderer
-	);
-	if (m_renderer == nullptr)
-	{
-		std::cout << "Renderer could not be created! SDL_Error: " << SDL_GetError() << std::endl;
-		return false;
-	}
-
-	m_texture = std::unique_ptr<SDL_Texture, std::function<void(SDL_Texture*)>>(
-		SDL_CreateTexture(m_renderer.get(), SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
-			m_displayWidth * 2, m_displayHeight * 2),
-		SDL_DestroyTexture
-	);
-	if (m_texture == nullptr)
-	{
-		std::cout << "Texture could not be created! SDL_Error: " << SDL_GetError() << std::endl;
-		return false;
-	}
-
-	m_rectTexture = { 0, 0,  static_cast<int>(m_displayWidth), static_cast<int>(m_displayHeight) };
-	m_rectWindow = { 0, 0,  static_cast<int>(m_windowWidth), static_cast<int>(m_windowHeight) };
+	
+	m_panel.setRotation(0);
+	m_panel.fillScreen(m_backgroundColor);
+	m_panel.startWrite();
 
 	Display::CLS();
 
@@ -79,16 +49,9 @@ bool Display::Init()
 
 void Display::Update()
 {
-	SDL_Event e;
-	SDL_PollEvent(&e);
-	if (e.type == SDL_QUIT)
-		m_closeWindow = true;
-
 	if (!m_closeWindow)
 	{
-		SDL_RenderClear(m_renderer.get());
 		Render();
-		SDL_RenderPresent(m_renderer.get());
 	}
 	else
 	{
@@ -98,11 +61,8 @@ void Display::Update()
 
 void Display::Close()
 {
-	m_renderer.reset();
-	m_window.reset();
-	m_texture.reset();
-
-	SDL_Quit();
+	m_panel.endWrite();
+	m_panel.fillScreen(0);
 }
 
 void Display::CLS()
@@ -125,7 +85,8 @@ void Display::CLS()
 		break;
 	}
 
-	std::fill(m_combineBuffer.begin(), m_combineBuffer.end(), 0);
+	// TODO: Review fill with backgroundColor
+	std::fill(m_combineBuffer.begin(), m_combineBuffer.end(), m_backgroundColor);
 }
 
 void Display::ScrollUp(const unsigned int lines)
@@ -299,46 +260,48 @@ void Display::ScrollLeft(const unsigned int lines)
 	}
 }
 
-void Display::DrawPixel(unsigned int x, unsigned int y, bool planeLSB, bool planeMSB)
-{
-	SDL_Rect pixel;
+// DEPRECATED VERSION!
 
-	unsigned int scaleX = static_cast<unsigned int>(m_windowWidth / m_displayWidth);
-	unsigned int scaleY = static_cast<unsigned int>(m_windowHeight / m_displayHeight);
+// void Display::DrawPixel(unsigned int x, unsigned int y, bool planeLSB, bool planeMSB)
+// {
+// 	SDL_Rect pixel;
 
-	pixel.x = x * scaleX;
-	pixel.y = y * scaleY;
-	pixel.w = scaleX;
-	pixel.h = scaleY;
+// 	unsigned int scaleX = static_cast<unsigned int>(m_windowWidth / m_displayWidth);
+// 	unsigned int scaleY = static_cast<unsigned int>(m_windowHeight / m_displayHeight);
 
-	uint8_t pixelColor = (static_cast<uint8_t>(planeMSB) << 1) | static_cast<uint8_t>(planeLSB);
-	uint32_t selectedColor = 0;
+// 	pixel.x = x * scaleX;
+// 	pixel.y = y * scaleY;
+// 	pixel.w = scaleX;
+// 	pixel.h = scaleY;
 
-	switch (pixelColor)
-	{
-	case BACKGROUND:
-		selectedColor = m_backgroundColor;
-		break;
-	case FOREGROUND1:
-		selectedColor = m_foreground_1Color;
-		break;
-	case FOREGROUND2:
-		selectedColor = m_foreground_2Color;
-		break;
-	case BLENDED:
-		selectedColor = m_blendedColor;
-		break;
-	default:
-		printf("ERROR: PixelColor not valid! PixelColor selected: %d\n", pixelColor);
-		exit(-1);
-		break;
-	}
+// 	uint8_t pixelColor = (static_cast<uint8_t>(planeMSB) << 1) | static_cast<uint8_t>(planeLSB);
+// 	uint32_t selectedColor = 0;
 
-	SDL_SetRenderDrawColor(m_renderer.get(),
-		(selectedColor >> 16) & 0xFF, (selectedColor >> 8) & 0xFF, selectedColor & 0xFF, 0xFF);
+// 	switch (pixelColor)
+// 	{
+// 	case BACKGROUND:
+// 		selectedColor = m_backgroundColor;
+// 		break;
+// 	case FOREGROUND1:
+// 		selectedColor = m_foreground_1Color;
+// 		break;
+// 	case FOREGROUND2:
+// 		selectedColor = m_foreground_2Color;
+// 		break;
+// 	case BLENDED:
+// 		selectedColor = m_blendedColor;
+// 		break;
+// 	default:
+// 		printf("ERROR: PixelColor not valid! PixelColor selected: %d\n", pixelColor);
+// 		exit(-1);
+// 		break;
+// 	}
 
-	SDL_RenderFillRect(m_renderer.get(), &pixel);
-}
+// 	SDL_SetRenderDrawColor(m_renderer.get(),
+// 		(selectedColor >> 16) & 0xFF, (selectedColor >> 8) & 0xFF, selectedColor & 0xFF, 0xFF);
+
+// 	SDL_RenderFillRect(m_renderer.get(), &pixel);
+// }
 
 void Display::DrawPixelToCombineBuffer(unsigned int x, unsigned int y, bool planeLSB, bool planeMSB)
 {
@@ -372,21 +335,8 @@ void Display::DrawPixelToCombineBuffer(unsigned int x, unsigned int y, bool plan
 
 void Display::UpdateTexture()
 {
-	void* texturePixels;
-	int pitch;
-
-	if (SDL_LockTexture(m_texture.get(), nullptr, &texturePixels, &pitch) == 0)
-	{
-		uint8_t* dst = static_cast<uint8_t*>(texturePixels); // Destination pointer (texture memory)
-		const uint8_t* src = reinterpret_cast<const uint8_t*>(m_combineBuffer.data()); // Source pointer (buffer memory)
-		for (int y = 0; y < m_displayHeight; ++y)
-		{
-			std::memcpy(dst, src, m_displayWidth * sizeof(uint32_t)); // Copy one row
-			dst += pitch; // Move to the next row in the texture (with pitch)
-			src += m_displayWidth * sizeof(uint32_t); // Move to the next row in the buffer (no pitch)
-		}
-	}
-	SDL_UnlockTexture(m_texture.get());
+	// Much simplier than before, just set the pixels as they are in the panel.
+	m_panel.pushPixels((const void*)m_combineBuffer.data(), m_displayWidth * m_displayHeight);
 }
 
 void Display::Render()
@@ -400,11 +350,6 @@ void Display::Render()
 		}
 	}
 	Display::UpdateTexture();
-
-	if (m_extendedMode)
-		SDL_RenderCopy(m_renderer.get(), m_texture.get(), nullptr, &m_rectWindow);
-	else
-		SDL_RenderCopy(m_renderer.get(), m_texture.get(), &m_rectTexture, &m_rectWindow);
 }
 
 void Display::SetExtendedMode(const bool enable)

@@ -1,9 +1,8 @@
 #pragma once
 #include <string>
 #include <memory>
-#include <array>
-#include <functional>
-#include <SDL.h>
+#include <FisicalPanel.h>
+#include "Log.h"
 
 class Display
 {
@@ -70,13 +69,7 @@ private:
 	std::vector<bool> m_secondPlane;
 	std::vector<uint32_t> m_combineBuffer;
 
-	std::unique_ptr < SDL_Window, std::function<void(SDL_Window*)>> m_window;
-	std::unique_ptr<SDL_Renderer, std::function<void(SDL_Renderer*)>> m_renderer;
-
-	std::unique_ptr<SDL_Texture, std::function<void(SDL_Texture*)>> m_texture;
-
-	SDL_Rect m_rectTexture;
-	SDL_Rect m_rectWindow;
+	FisicalPanel m_panel;
 
 	enum ACTIVEPLANE m_activePlane;
 
