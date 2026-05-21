@@ -7,4 +7,10 @@ idf_component_register(
     SRCS ${app_sources}
     INCLUDE_DIRS
         "."
-        "../include")
+        "../include"
+    REQUIRES
+        nvs_flash
+        driver
+        fatsfs
+        sdmmc
+)
