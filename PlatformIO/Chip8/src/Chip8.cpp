@@ -6,7 +6,7 @@ Chip8::Chip8() :
 	m_memory({ 0 }),
 	m_stack({ 0 }),
 	m_sp(m_stack.begin()),
-	m_config("./Config/Config.toml"),
+	m_config("/sdcard/config/Config.toml"),
 	m_display("Chip 8", m_config.GetWindowWidth(), m_config.GetWindowHeight(),
 		m_config.GetDisplayWidth(), m_config.GetDisplayHeight(),
 		m_config.GetDisplayBackgroundColor(), m_config.GetDisplayForeground_1Color(),
