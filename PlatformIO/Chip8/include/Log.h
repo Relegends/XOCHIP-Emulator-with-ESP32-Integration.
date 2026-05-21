@@ -1,13 +1,5 @@
 #pragma once
-#include <iostream>
-#include <stdarg.h>
+#include <esp_log.h>
 
-class Log
-{
-public:
-	static void LogConsole(const char* format, ...);
-};
-
-
-#define LOG(...)	Log::LogConsole(__VA_ARGS__)
+#define LOG(...)	ESP_LOGI("CHIP8", ##__VA_ARGS__)
 
