@@ -9,51 +9,63 @@ Audio::Audio(unsigned int freq, unsigned int sampleRate, unsigned int volume)
 	m_playingSound = false;
 	m_patternBufferInit = false;
 
-	m_runningSampleIndex = 0;
+	m_runningSampleIndex = 0.0;
 
 	m_pitch = 64;
 
-	m_audioDev = 0;
+	m_samplesPerFrame = m_sampleRate / 60;
+	m_ringBuffer.Init(m_samplesPerFrame * 2);
 
-	m_audioSpec.freq = 44100; // CD quality
-	m_audioSpec.format = AUDIO_F32LSB;
-	m_audioSpec.channels = 1;
-	m_audioSpec.samples = 128;
-	m_audioSpec.userdata = this;
-	m_audioSpec.callback = XOChipAudioCallback;
+	m_i2sPort = I2S_NUM_0;
+	m_bufferDMA = 256;
+}
 
-	m_samplesPerFrame = m_audioSpec.freq / 60;
-	m_ringBuffer.Init(m_samplesPerFrame);
+Audio::~Audio()
+{
+	Close();
 }
 
 bool Audio::Init()
 {
-	if (SDL_Init(SDL_INIT_AUDIO) < 0) {
-		printf("SDL could not initialize! SDL Error: %s\n", SDL_GetError());
+	i2s_config_t i2sConfig = {};
+	i2sConfig.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN);
+	i2sConfig.sample_rate = m_sampleRate;
+	i2sConfig.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT;
+	i2sConfig.channel_format = I2S_CHANNEL_FMT_ONLY_LEFT;
+	i2sConfig.communication_format = I2S_COMM_FORMAT_I2S_MSB;
+	i2sConfig.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1;
+	i2sConfig.dma_buf_len = m_bufferDMA;
+	i2sConfig.dma_buf_count = 4;
+
+	esp_err_t err = i2s_driver_install(m_i2sPort, &i2sConfig, 0, nullptr);
+	if (err != ESP_OK) {
+		LOGE("[Audio] Failed to install I2S driver: %d", err);
 		return false;
 	}
 
-	SDL_AudioSpec obtained;
-	m_audioDev = SDL_OpenAudioDevice(NULL, 0, &m_audioSpec, &obtained, 0);
+	i2s_set_dac_mode(I2S_DAC_CHANNEL_BOTH_EN);
+	i2s_set_pin(m_i2sPort, nullptr);
 
-	if (!m_audioDev) {
-		printf("Failed to open audio device: %s\n", SDL_GetError());
-		return false;
-	}
+	xTaskCreate(XOAudioTask, "XOAudioTask", 2048, this, configMAX_PRIORITIES - 1, &m_audioTaskHandle);
+	LOG("[Audio] Audio initialized successfully");
 
 	return true;
 }
 
 void Audio::Close()
 {
-	SDL_CloseAudioDevice(m_audioDev);
-	SDL_Quit();
+	if (m_audioTaskHandle) {
+		vTaskDelete(m_audioTaskHandle);
+		m_audioTaskHandle = nullptr;
+	}
+
+	i2s_driver_uninstall(m_i2sPort);
+	LOG("[Audio] Audio closed successfully");
 }
 
 void Audio::PlaySound(bool on)
 {
 	m_playingSound = on;
-	SDL_PauseAudioDevice(m_audioDev, !m_playingSound);
 }
 
 void Audio::SetPitch(const uint8_t value)
@@ -65,7 +77,7 @@ void Audio::LoadPatternBuffer(const uint8_t* source)
 {
 	std::scoped_lock lock(m_audioMutex);
 	m_patternBufferInit = true;
-	std::memcpy(m_patternBuffer.data(), source, m_patternBuffer.size());
+	memcpy(m_patternBuffer.data(), source, m_patternBuffer.size());
 }
 
 void Audio::GenerateAudioSamples()
@@ -78,7 +90,7 @@ void Audio::GenerateAudioSamples()
 		// Calculate the playback rate in Hz based on the pitch register
 		float playbackRate = (4000.0f * std::pow(2.0f, (float(m_pitch) - 64.0f) / 48.0f));
 		// Calculate the step size
-		float step = playbackRate / m_audioSpec.freq;
+		float step = playbackRate / 44100.0f;
 
 		for (int i = 0; i < m_samplesPerFrame; i++)
 		{
@@ -121,6 +133,37 @@ void Audio::GenerateAudioSamples()
 	}
 }
 
+void Audio::XOAudioTask(void *param)
+{
+	Audio* audio = static_cast<Audio*>(param);
+	const size_t bufferSize = 256; // SAME AS m_bufferDMA
+	int16_t sampleBuffer[bufferSize];
+
+	while (true) {
+		if (!audio->m_playingSound) {
+			memset(sampleBuffer, 0, sizeof(sampleBuffer));
+			i2s_write(audio->m_i2sPort, sampleBuffer, sizeof(sampleBuffer), nullptr, portMAX_DELAY);
+			continue;
+		}
+
+		size_t numSamples = 0;
+		
+		std::scoped_lock lock(audio->m_audioMutex);
+		while (!audio->m_ringBuffer.Empty() && numSamples < bufferSize) {
+			float sample = audio->m_ringBuffer.Pop();
+			int16_t val = static_cast<int16_t>(sample * 32767.0f * 2.0f);
+			val = (val * audio->m_volume) / 100;
+			sampleBuffer[numSamples++] = val;
+		}
+
+		if (numSamples < bufferSize)
+			memset(&sampleBuffer[numSamples], 0, (bufferSize - numSamples) * sizeof(int16_t));
+		
+		i2s_write(audio->m_i2sPort, sampleBuffer, sizeof(sampleBuffer), nullptr, portMAX_DELAY);
+	}
+}
+
+/*
 void Audio::XOChipAudioCallback(void* userdata, uint8_t* stream, int len)
 {
 	Audio* audio = reinterpret_cast<Audio*>(userdata);
@@ -151,3 +194,4 @@ void Audio::SquareWaveCallback(void* userdata, uint8_t* stream, int len) {
 		data[i] = (((int)audio->m_runningSampleIndex++ / halfSquareWavePeriod) % 2) ? 0.5f : -0.5f;
 	}
 }
+*/

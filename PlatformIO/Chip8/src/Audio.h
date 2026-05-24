@@ -1,16 +1,19 @@
 #pragma once
-#include <string>
 #include <array>
-#include <vector>
 #include <cmath>
 #include <mutex>
-#include "SDL.h"
+#include <string>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <driver/i2s.h>
 #include "RingBuffer.h"
+#include "Log.h"
 
 class Audio
 {
 public:
 	Audio(unsigned int freq, unsigned int sampleRate, unsigned int volume);
+	~Audio();
 
 	bool Init();
 	void Close();
@@ -23,13 +26,13 @@ public:
 
 private:
 
-	static void SquareWaveCallback(void* userdata, uint8_t* stream, int len);
+	// Deprecated callbacks, replaced by AudioTask
+	//static void SquareWaveCallback(void* userdata, uint8_t* stream, int len);
+	//static void XOChipAudioCallback(void* userdata, uint8_t* stream, int len);
 
-	static void XOChipAudioCallback(void* userdata, uint8_t* stream, int len);
+	static void XOAudioTask(void* param);
 
 private:
-	SDL_AudioSpec m_audioSpec;
-	SDL_AudioDeviceID m_audioDev;
 	
 	bool m_playingSound;
 	bool m_patternBufferInit;
@@ -48,5 +51,10 @@ private:
 
 	std::array<uint8_t, 16> m_patternBuffer;
 	RingBuffer<float> m_ringBuffer;
+
+	// Internal DAC config
+	i2s_port_t m_i2sPort;
+	TaskHandle_t m_audioTaskHandle;
+	int m_bufferDMA;
 };
 
