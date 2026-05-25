@@ -17,7 +17,10 @@ template<typename T>
 void RingBuffer<T>::Init(size_t capacity)
 {
     if (m_init)
-        throw std::runtime_error("Buffer is alredy initialized!");
+    {
+        LOGE("Buffer is alredy initialized!");
+        abort();
+    }
     
     m_buffer = new T[capacity];
     m_capacity = capacity;
@@ -30,7 +33,8 @@ void RingBuffer<T>::Init(size_t capacity)
 template<typename T>
 void RingBuffer<T>::Push(const T& sample) {
     if (!m_init) {
-        throw std::runtime_error("Buffer is not initialized");
+        LOGE("Buffer is not initialized");
+        abort();
     }
     m_buffer[m_head] = sample;
     m_head = (m_head + 1) % m_capacity;
@@ -43,10 +47,12 @@ void RingBuffer<T>::Push(const T& sample) {
 template<typename T>
 T RingBuffer<T>::Pop() {
     if (!m_init) {
-        throw std::runtime_error("Buffer is not initialized");
+        LOGE("Buffer is not initialized");
+        abort();
     }
     if (Empty()) {
-        throw std::runtime_error("Buffer is empty");
+        LOGE("Buffer is empty");
+        abort();
     }
     auto value = m_buffer[m_tail];
     m_full = false;
@@ -67,7 +73,8 @@ bool RingBuffer<T>::Full() const {
 template <typename T>
 size_t RingBuffer<T>::Size() const {
     if (!m_init) {
-        throw std::runtime_error("Buffer is not initialized");
+        LOGE("Buffer is not initialized");
+        abort();
     }
     size_t size = m_capacity;
     if (!m_full) {
@@ -84,7 +91,8 @@ size_t RingBuffer<T>::Size() const {
 template<typename T>
 size_t RingBuffer<T>::Capacity() const {
     if (!m_init) {
-        throw std::runtime_error("Buffer is not initialized");
+        LOGE("Buffer is not initialized");
+        abort();
     }
     return m_capacity;
 }

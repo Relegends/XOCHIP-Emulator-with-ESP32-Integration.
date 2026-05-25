@@ -1,6 +1,7 @@
 
 #pragma once
 #include <stdexcept>
+#include "Log.h"
 
 template <typename T>
 class RingBuffer {
