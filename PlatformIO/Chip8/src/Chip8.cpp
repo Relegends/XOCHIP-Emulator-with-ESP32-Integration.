@@ -6,26 +6,51 @@ Chip8::Chip8() :
 	m_memory({ 0 }),
 	m_stack({ 0 }),
 	m_sp(m_stack.begin()),
-	m_config("/sdcard/config/Config.toml"),
-	m_display("Chip 8", m_config.GetWindowWidth(), m_config.GetWindowHeight(),
+	m_config(),
+	m_display(),
+	m_audio(),
+	m_keyboard(),
+	m_decoder({ 0 }),
+	m_interpreter(INTERPRETER::XOCHIP),
+	m_instructionCount(0),
+	m_ipf(0),
+	m_logggingMode(LOGGINGMODE::NONE)
+{
+	
+}
+
+bool Chip8::Init(const std::string& configFilePath)
+{
+	LOG("{Chip8} Initializing Chip8...");
+	if(!m_config.Init(configFilePath)) return false;
+	if(!m_display.Init(
+		m_config.GetWindowWidth(), m_config.GetWindowHeight(),
 		m_config.GetDisplayWidth(), m_config.GetDisplayHeight(),
 		m_config.GetDisplayBackgroundColor(), m_config.GetDisplayForeground_1Color(),
-		m_config.GetDisplayForeground_2Color(), m_config.GetDisplayBlendedColor()),
-	m_audio(m_config.GetAudioFrequency(), m_config.GetAudioSampleRate(), m_config.GetAudioVolume()),
-	m_keyboard({ m_config.GetInputMap() }),
-	m_decoder({ 0 }),
-	m_interpreter((Chip8::INTERPRETER)m_config.GetInterpretedMode()),
-	m_instructionCount(0),
-	m_ipf(m_config.GetIPF()),
-	m_logggingMode((Chip8::LOGGINGMODE)m_config.GetLoggingMode())
-{
-	if (!m_display.Init()) exit(-1);
-	if (!m_audio.Init()) exit(-1);
+		m_config.GetDisplayForeground_2Color(), m_config.GetDisplayBlendedColor())) return false;
+	if(!m_audio.Init(m_config.GetAudioFrequency(), m_config.GetAudioSampleRate(), m_config.GetAudioVolume())) return false;
+	//if(!m_keyboard.Init(m_config.GetInputMap())) return false;
+
+	m_V = { 0 };
+	m_memory = { 0 };
+	m_pc = 0x200; // Start Address
+	m_stack = { 0 };
+	m_sp = m_stack.begin();
+	m_decoder = { 0 };
+	m_instructionCount = 0;
+	m_delayTimer = 0;
+	m_soundTimer = 0;
+
+	m_interpreter = (Chip8::INTERPRETER)m_config.GetInterpretedMode();
+	m_logggingMode = (Chip8::LOGGINGMODE)m_config.GetLoggingMode();
+	m_ipf = m_config.GetIPF();
+
 	std::srand(static_cast<unsigned int>(std::time(0)));
 
 	InitQuirks();
-
 	LoadFontSet();
+
+	return true;
 }
 
 void Chip8::LoadFontSet()
@@ -165,9 +190,8 @@ void Chip8::LoadFontSet()
 		};
 		break;
 	default:
-		std::cout << "NOT VALID INTERPRETER!!!" << std::endl;
-		exit(-1);
-		break;
+		LOGE("{Chip8} NOT VALID INTERPRETER!!!");
+		abort();
 	}
 }
 
@@ -208,7 +232,8 @@ void Chip8::InitQuirks()
 		m_Jumping_quirk = false;
 		break;
 	default:
-		break;
+		LOGE("{Chip8} NOT VALID INTERPRETER!!!");
+		abort();
 	}
 
 	UpdateQuirk(m_VFreset_quirk, m_config.GetVFresetQuirk());
@@ -404,29 +429,32 @@ void Chip8::SkipNextInstruction()
 	}
 }
 
-void Chip8::LoadGame(const std::string& gameName)
+bool Chip8::LoadGame(const std::string& gameName)
 {
 	std::ifstream gameFile(gameName, std::ifstream::binary);
 
-	if (gameFile.is_open()) {
-		gameFile.seekg(0, gameFile.end);
-		std::streamoff fileSize = gameFile.tellg();
-		gameFile.seekg(0, gameFile.beg);
-
-		char* buffer = new char[fileSize];
-
-		gameFile.read(buffer, fileSize);
-
-		gameFile.close();
-
-		for (int i = 0; i < fileSize; i++) {
-			m_memory[m_pc++] = buffer[i];
-		}
-
-		m_pc = 0x200; // Return the pc to the start of the program. 
-
-		delete[] buffer;
+	if (!gameFile.is_open()) {
+		LOGE("{Chip8} Failed to open game file: %s", gameName.c_str());
+		return false;
 	}
+	gameFile.seekg(0, gameFile.end);
+	std::streamoff fileSize = gameFile.tellg();
+	gameFile.seekg(0, gameFile.beg);
+
+	std::vector<char> buffer(fileSize);
+
+	gameFile.read(buffer.data(), fileSize);
+
+	gameFile.close();
+
+	for (int i = 0; i < fileSize; i++) {
+		m_memory[m_pc++] = buffer[i];
+	}
+
+	m_pc = 0x200; // Return the pc to the start of the program. 
+
+	LOG("{Chip8} Game loaded: %s", gameName.c_str());
+	return true;
 }
 
 void Chip8::Simulate_Cycle()
@@ -439,48 +467,31 @@ void Chip8::Simulate_Cycle()
 
 void Chip8::Run()
 {
-	std::chrono::high_resolution_clock::time_point start{}, end{};
-	std::chrono::microseconds elapsedTime{ 0 };
-	std::chrono::microseconds thresholdCPU{ 16667 }; // 16.67 ms
+	LOG("{Chip8} Starting Run loop...");
+	const float targetFPS = 60.0f;
+	const float targetTimeBtwFrames = 1000.0f / targetFPS;
+	const TickType_t framePeriod = static_cast<TickType_t>(targetTimeBtwFrames / portTICK_PERIOD_MS);
 
-	std::chrono::high_resolution_clock::time_point nextFrameTime = std::chrono::high_resolution_clock::now();
+	TickType_t lastFrameTick = xTaskGetTickCount();
 
 	while (!m_display.IsWindowClose())
 	{
-		start = std::chrono::high_resolution_clock::now();
-
-		m_keyboard.ProcessInput();
-
+		//m_keyboard.ProcessInput();
 
 		while (m_instructionCount < m_ipf)
 		{
-			//auto s = std::chrono::high_resolution_clock::now();
 			Simulate_Cycle();
-			//auto e = std::chrono::high_resolution_clock::now();
-			//auto el = std::chrono::duration_cast<std::chrono::microseconds>(e - s);
-			//LOG("Instruction executed in: %d us\n", el.count());
-
-			
 			m_instructionCount++;
 		}
 		m_instructionCount = 0;
 
-		m_keyboard.SavePreviousInputs();
+		//m_keyboard.SavePreviousInputs();
 
 		m_display.Update();
 
 		UpdateTimers();
 
-		// Calculate the time for the next frame
-		nextFrameTime += thresholdCPU;
-
-		// Sleep until the next frame time
-		std::this_thread::sleep_until(nextFrameTime);
-
-		// Calculate and log the elapsed time for debugging
-		auto end = std::chrono::high_resolution_clock::now();
-		auto elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-		std::cout << "Total frame time: " << elapsedTime.count() << " us" << std::endl;
+		vTaskDelayUntil(&lastFrameTick, framePeriod);
 	}
 
 	m_audio.Close();

@@ -1,10 +1,10 @@
 #include "Audio.h"
 
-Audio::Audio(unsigned int freq, unsigned int sampleRate, unsigned int volume)
+Audio::Audio()
 {
-	m_frequency = freq;
-	m_sampleRate = sampleRate;
-	m_volume = volume;
+	m_frequency = 0;
+	m_sampleRate = 0;
+	m_volume = 0;
 
 	m_playingSound = false;
 	m_patternBufferInit = false;
@@ -17,6 +17,7 @@ Audio::Audio(unsigned int freq, unsigned int sampleRate, unsigned int volume)
 	m_ringBuffer.Init(m_samplesPerFrame * 2);
 
 	m_i2sPort = I2S_NUM_0;
+	m_txHandle = nullptr;
 	m_bufferDMA = 256;
 }
 
@@ -25,30 +26,63 @@ Audio::~Audio()
 	Close();
 }
 
-bool Audio::Init()
+bool Audio::Init(unsigned int freq, unsigned int sampleRate, unsigned int volume)
 {
-	i2s_config_t i2sConfig = {};
-	i2sConfig.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN);
-	i2sConfig.sample_rate = m_sampleRate;
-	i2sConfig.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT;
-	i2sConfig.channel_format = I2S_CHANNEL_FMT_ONLY_LEFT;
-	i2sConfig.communication_format = I2S_COMM_FORMAT_I2S_MSB;
-	i2sConfig.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1;
-	i2sConfig.dma_buf_len = m_bufferDMA;
-	i2sConfig.dma_buf_count = 4;
+	LOG("[Audio] Initializing audio...");
 
-	esp_err_t err = i2s_driver_install(m_i2sPort, &i2sConfig, 0, nullptr);
+	m_frequency = freq;
+	m_sampleRate = sampleRate;
+	m_volume = volume;
+
+	i2s_chan_config_t channelConfig = I2S_CHANNEL_DEFAULT_CONFIG(m_i2sPort, I2S_ROLE_MASTER);
+	channelConfig.auto_clear = true;
+	
+	esp_err_t err = i2s_new_channel(&channelConfig, &m_txHandle, nullptr);
 	if (err != ESP_OK) {
-		LOGE("[Audio] Failed to install I2S driver: %d", err);
+		LOGE("[Audio] Failed to create I2S channel: %s", esp_err_to_name(err));
 		return false;
 	}
 
-	i2s_set_dac_mode(I2S_DAC_CHANNEL_BOTH_EN);
-	i2s_set_pin(m_i2sPort, nullptr);
+	i2s_std_config_t i2sConfig = {
+		.clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(m_sampleRate),
+		.slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO),
+		.gpio_cfg =
+		{
+			.mclk = I2S_GPIO_UNUSED,
+			.bclk = I2S_GPIO_UNUSED,
+			.ws = I2S_GPIO_UNUSED,
+			.dout = I2S_GPIO_UNUSED,
+			.din = I2S_GPIO_UNUSED,
+			.invert_flags =
+			{
+				.mclk_inv = false,
+				.bclk_inv = false,
+				.ws_inv = false
+			}
+		}
+	};
 
-	xTaskCreate(XOAudioTask, "XOAudioTask", 2048, this, configMAX_PRIORITIES - 1, &m_audioTaskHandle);
+
+	err = i2s_channel_init_std_mode(m_txHandle, &i2sConfig);
+	if (err != ESP_OK) {
+		LOGE("[Audio] Failed to init I2S channel: %s", esp_err_to_name(err));
+		return false;
+	}
+
+	err = i2s_channel_enable(m_txHandle);
+	if (err != ESP_OK) {
+		LOGE("[Audio] Failed to enable I2S channel: %s", esp_err_to_name(err));
+		return false;
+	}
+
+	if (xTaskCreate(XOAudioTask, "XOAudioTask", 4096, this, configMAX_PRIORITIES - 1, &m_audioTaskHandle) != pdPASS) {
+		LOGE("[Audio] Failed to create audio task");
+		i2s_channel_disable(m_txHandle);
+		i2s_del_channel(m_txHandle);
+		return false;
+	}
+	
 	LOG("[Audio] Audio initialized successfully");
-
 	return true;
 }
 
@@ -58,8 +92,12 @@ void Audio::Close()
 		vTaskDelete(m_audioTaskHandle);
 		m_audioTaskHandle = nullptr;
 	}
+	if (m_txHandle) {
+		i2s_channel_disable(m_txHandle);
+		i2s_del_channel(m_txHandle);
+		m_txHandle = nullptr;
+	}
 
-	i2s_driver_uninstall(m_i2sPort);
 	LOG("[Audio] Audio closed successfully");
 }
 
@@ -142,7 +180,7 @@ void Audio::XOAudioTask(void *param)
 	while (true) {
 		if (!audio->m_playingSound) {
 			memset(sampleBuffer, 0, sizeof(sampleBuffer));
-			i2s_write(audio->m_i2sPort, sampleBuffer, sizeof(sampleBuffer), nullptr, portMAX_DELAY);
+			i2s_channel_write(audio->m_txHandle, sampleBuffer, sizeof(sampleBuffer), nullptr, portMAX_DELAY);
 			continue;
 		}
 
@@ -159,7 +197,7 @@ void Audio::XOAudioTask(void *param)
 		if (numSamples < bufferSize)
 			memset(&sampleBuffer[numSamples], 0, (bufferSize - numSamples) * sizeof(int16_t));
 		
-		i2s_write(audio->m_i2sPort, sampleBuffer, sizeof(sampleBuffer), nullptr, portMAX_DELAY);
+		i2s_channel_write(audio->m_txHandle, sampleBuffer, sizeof(sampleBuffer), nullptr, portMAX_DELAY);
 	}
 }
 

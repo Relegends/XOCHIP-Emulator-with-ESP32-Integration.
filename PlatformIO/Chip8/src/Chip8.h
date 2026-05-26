@@ -5,8 +5,8 @@
 #include <array>
 #include <cstdlib>
 #include <iostream>
-#include <chrono>
-#include <thread>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include "Display.h"
 #include "Audio.h"
@@ -19,8 +19,10 @@ class Chip8
 public:
 
 	Chip8();
+
+	bool Init(const std::string& configFilePath);
 	
-	void LoadGame(const std::string& gameName);
+	bool LoadGame(const std::string& gameName);
 
 	void Simulate_Cycle();
 

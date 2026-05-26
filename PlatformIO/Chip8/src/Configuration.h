@@ -2,11 +2,14 @@
 #include <toml.hpp>
 #include <vector>
 #include <iostream>
+#include <Log.h>
 
 class Configuration
 {
 public:
-	Configuration(std::string configPath);
+	Configuration();
+
+	bool Init(const std::string& configPath);
 
 	unsigned int GetLoggingMode() const;
 	unsigned int GetInterpretedMode() const;

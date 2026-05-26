@@ -5,17 +5,17 @@
 #include <string>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <driver/i2s.h>
+#include <driver/i2s_std.h>
 #include "RingBuffer.h"
 #include "Log.h"
 
 class Audio
 {
 public:
-	Audio(unsigned int freq, unsigned int sampleRate, unsigned int volume);
+	Audio();
 	~Audio();
 
-	bool Init();
+	bool Init(unsigned int freq, unsigned int sampleRate, unsigned int volume);
 	void Close();
 
 	void PlaySound(bool on);
@@ -54,6 +54,7 @@ private:
 
 	// Internal DAC config
 	i2s_port_t m_i2sPort;
+	i2s_chan_handle_t m_txHandle;
 	TaskHandle_t m_audioTaskHandle;
 	int m_bufferDMA;
 };

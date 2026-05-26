@@ -1,14 +1,32 @@
 #include "Display.h"
 #include <iostream>
 
-Display::Display(const std::string& name,
+Display::Display() :
+	m_panel()
+{
+	m_windowWidth = 0;
+	m_windowHeight = 0;
+	m_displayWidth = 0;
+	m_displayHeight = 0;
+	m_backgroundColor = 0;
+	m_foreground_1Color = 0;
+	m_foreground_2Color = 0;
+	m_blendedColor = 0;
+
+	m_closeWindow = false;
+	m_extendedMode = false;
+
+	m_activePlane = LSB_PLANE;
+}
+
+bool Display::Init(
 	const unsigned int windowWidth, const unsigned int windowHeight,
 	const unsigned int displayWidth, const unsigned int displayHeight,
 	const uint32_t backgroundColor, const uint32_t foreground1Color,
-	const uint32_t foreground2Color, const uint32_t blendedColor) :
-	m_panel({windowWidth, windowHeight})
+	const uint32_t foreground2Color, const uint32_t blendedColor)
 {
-	m_windowName = name;
+	LOG("{Display} Initializing display...");
+	
 	m_windowWidth = windowWidth;
 	m_windowHeight = windowHeight;
 	m_displayWidth = displayWidth;
@@ -18,32 +36,35 @@ Display::Display(const std::string& name,
 	m_foreground_2Color = foreground2Color;
 	m_blendedColor = blendedColor;
 
-	m_closeWindow = false;
-	m_extendedMode = false;
-
-	m_activePlane = LSB_PLANE;
-
 	m_display.resize(displayHeight * displayWidth);
 	m_secondPlane.resize(displayHeight * displayWidth);
 	m_combineBuffer.resize(displayHeight * displayWidth);
-}
 
-bool Display::Init()
-{
-	if (!m_panel.init())
+	if (!m_panel.Init(m_windowWidth, m_windowHeight)) // Init the bus for the fisical panel
 	{
-		LOG("ERROR! Panel init went wrong!");
+		LOG("{Display} ERROR! Failed to initialize physical panel!");
 		return false;
 	}
-	
+
 	m_panel.setRotation(0);
 	m_panel.fillScreen(m_backgroundColor);
 	m_panel.startWrite();
 
 	Display::CLS();
 
-	return true;
+	LOG("{Display} Panel Width: %d, Panel Height: %d, Display Width: %d, Display Height: %d", m_windowWidth, m_windowHeight, m_displayWidth, m_displayHeight);
+	LOG("{Display} BackgroundColor: %08X, Foreground1Color: %08X, Foreground2Color: %08X, BlendedColor: %08X", m_backgroundColor, m_foreground_1Color, m_foreground_2Color, m_blendedColor);
+	LOG("{Display} Initialized successfully!");
 
+	m_panel.fillScreen(0xF800);  // Rojo puro (RGB565)
+vTaskDelay(2000 / portTICK_PERIOD_MS);
+m_panel.fillScreen(0x07E0);  // Verde puro
+vTaskDelay(2000 / portTICK_PERIOD_MS);
+m_panel.fillScreen(0x001F);  // Azul puro
+vTaskDelay(2000 / portTICK_PERIOD_MS);
+m_panel.fillScreen(0x0000);  // Negro
+
+	return true;
 }
 
 
@@ -80,12 +101,11 @@ void Display::CLS()
 		std::fill(m_secondPlane.begin(), m_secondPlane.end(), 0);
 		break;
 	default:
-		printf("Not valid plane selected! Selected: %d\n", m_activePlane);
-		exit(-1);
+		LOGE("{Display} Not valid plane selected! Selected: %d", m_activePlane);
+		abort();
 		break;
 	}
 
-	// TODO: Review fill with backgroundColor
 	std::fill(m_combineBuffer.begin(), m_combineBuffer.end(), m_backgroundColor);
 }
 

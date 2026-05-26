@@ -19,4 +19,5 @@ public:
 private:
     std::string m_mountPoint;
     bool m_isMounted;
+    sdmmc_card_t* m_card;
 };

@@ -15,13 +15,13 @@ public:
 		BOTH
 	};
 
-	Display(const std::string& name,
+	Display();
+
+	bool Init(
 		const unsigned int windowWidth, const unsigned int windowHeight,
 		const unsigned int displayWidth, const unsigned int displayHeight,
 		const uint32_t backgroundColor, const uint32_t foreground1Color,
 		const uint32_t foreground2Color, const uint32_t blendedColor);
-
-	bool Init();
 	void Update();
 	void Close();
 

@@ -1,10 +1,20 @@
 #include "Configuration.h"
 
-Configuration::Configuration(std::string configPath)
+Configuration::Configuration()
 {
-	m_filePath = configPath;
-	m_config = toml::parse_file(configPath);
+	m_filePath = "";
+	m_config = toml::parse_result{};
 }
+
+bool Configuration::Init(const std::string &configPath)
+{
+	LOG("{Configuration} Initializing configuration from file: %s", configPath.c_str());
+
+	m_config = toml::parse_file(configPath);
+	m_filePath = configPath;
+	return true;
+}
+
 
 unsigned int Configuration::GetLoggingMode() const
 {

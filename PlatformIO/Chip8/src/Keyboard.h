@@ -2,8 +2,8 @@
 #include <string>
 #include <vector>
 #include <array>
-#include <memory>
-#include <driver/i2c.h>
+#include <driver/i2c_master.h>
+#include <freertos/FreeRTOS.h>
 #include "Log.h"
 
 // Registros del MCP23017
@@ -17,7 +17,9 @@
 class Keyboard
 {
 public:
-	Keyboard(const std::vector<std::pair<std::string, int>>& m_keyboard);
+	Keyboard();
+
+	bool Init(const std::vector<std::pair<std::string, int>>& keyboardConfig);
 
 	void ProcessInput();
 
@@ -26,6 +28,8 @@ public:
 	bool WaitForInput(int* returnValue);
 
 	int ReadKeyboard(const unsigned int position);
+
+private:
 
 	bool ReadI2CRegister(uint8_t reg, uint8_t* data);
 	bool WriteI2CRegister(uint8_t reg, uint8_t data);
@@ -37,6 +41,7 @@ private:
 	int keyPressed;
 
 	// I2C configuration
-	i2c_port_t m_i2cPort;
-	uint8_t m_i2cAddress;
+	i2c_master_bus_handle_t m_i2cBus;
+	i2c_master_dev_handle_t m_i2cDevice;
+
 };
