@@ -24,13 +24,20 @@ public:
 	unsigned int GetWindowHeight() const;
 	unsigned int GetDisplayWidth() const;
 	unsigned int GetDisplayHeight() const;
-	uint32_t GetDisplayBackgroundColor() const;
-	uint32_t GetDisplayForeground_1Color() const;
-	uint32_t GetDisplayForeground_2Color() const;
-	uint32_t GetDisplayBlendedColor() const;
+	unsigned int GetPanelWidth() const;
+	unsigned int GetPanelHeight() const;
+	uint16_t GetDisplayBackgroundColor() const;
+	uint16_t GetDisplayForeground_1Color() const;
+	uint16_t GetDisplayForeground_2Color() const;
+	uint16_t GetDisplayBlendedColor() const;
 	unsigned int GetAudioFrequency() const;
 	unsigned int GetAudioSampleRate() const;
 	unsigned int GetAudioVolume() const;
+	unsigned int GetRotation() const;
+	bool GetRGBOrder() const;
+	bool GetIsFlipY() const;
+
+
 
 	std::vector<std::pair<std::string, int>> GetInputMap() const;
 

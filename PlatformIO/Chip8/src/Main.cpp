@@ -10,43 +10,47 @@ void i2c_scan()
 {
     ESP_LOGI("I2C", "Scanning I2C bus...");
 
-    i2c_master_bus_config_t bus_cfg = {
-        .i2c_port = I2C_NUM_0,
-        .sda_io_num = GPIO_NUM_27,
-        .scl_io_num = GPIO_NUM_22,
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .glitch_ignore_cnt = 7,
-        .flags = {
-            .enable_internal_pullup = true,
-        },
-    };
+    // Try both pin combinations
+    gpio_num_t sda_pins[] = {GPIO_NUM_22, GPIO_NUM_27};
+    gpio_num_t scl_pins[] = {GPIO_NUM_27, GPIO_NUM_22};
 
-    i2c_master_bus_handle_t bus_handle = nullptr;
+    for (int combo = 0; combo < 2; combo++)
+    {
+        ESP_LOGI("I2C", "Trying SDA=%d SCL=%d", sda_pins[combo], scl_pins[combo]);
 
-    esp_err_t err = i2c_new_master_bus(&bus_cfg, &bus_handle);
+        i2c_master_bus_config_t bus_cfg = {
+            .i2c_port = I2C_NUM_0,
+            .sda_io_num = sda_pins[combo],
+            .scl_io_num = scl_pins[combo],
+            .clk_source = I2C_CLK_SRC_DEFAULT,
+            .glitch_ignore_cnt = 7,
+            .flags = { .enable_internal_pullup = true },
+        };
 
-    if (err != ESP_OK) {
-        ESP_LOGE("I2C", "Failed to create I2C bus: %s", esp_err_to_name(err));
-        return;
-    }
-
-    bool found = false;
-
-    for (uint8_t addr = 1; addr < 127; addr++) {
-
-        err = i2c_master_probe(bus_handle, addr, pdMS_TO_TICKS(100));
-
-        if (err == ESP_OK) {
-            ESP_LOGI("I2C", "Device found at 0x%02X", addr);
-            found = true;
+        i2c_master_bus_handle_t bus_handle = nullptr;
+        esp_err_t err = i2c_new_master_bus(&bus_cfg, &bus_handle);
+        if (err != ESP_OK) {
+            ESP_LOGE("I2C", "Failed to create bus: %s", esp_err_to_name(err));
+            continue;
         }
-    }
 
-    if (!found) {
-        ESP_LOGW("I2C", "No I2C devices found");
-    }
+        bool found = false;
+        for (uint8_t addr = 1; addr < 127; addr++)
+        {
+            err = i2c_master_probe(bus_handle, addr, pdMS_TO_TICKS(500));
+            if (err == ESP_OK)
+            {
+                ESP_LOGI("I2C", ">>> Device found at 0x%02X with SDA=%d SCL=%d <<<",
+                    addr, sda_pins[combo], scl_pins[combo]);
+                found = true;
+            }
+        }
 
-    i2c_del_master_bus(bus_handle);
+        if (!found)
+            ESP_LOGW("I2C", "Nothing found with this combination");
+
+        i2c_del_master_bus(bus_handle);
+    }
 
     ESP_LOGI("I2C", "Scan completed");
 }
@@ -76,7 +80,6 @@ extern "C" void app_main()
 		abort();
 	}
 
-	vTaskDelay(pdMS_TO_TICKS(1000));
 	LOG("{Main} Listing SD contents:");
 	list_dir("/sdcard");
 	list_dir("/sdcard/roms");
@@ -85,7 +88,7 @@ extern "C" void app_main()
 
 	bool emulatorInit = emulator->Init("/sdcard/config/Config.toml");
 
-	std::string romFile = "/sdcard/roms/1-chip8-logo.ch8";
+	std::string romFile = "/sdcard/roms/xomusicplayer.ch8";
 	LOG("{Main} Loading ROM: %s", romFile.c_str());
 
 	bool gameLoaded = emulator->LoadGame(romFile);

@@ -2,7 +2,8 @@
 #include <iostream>
 
 Display::Display() :
-	m_panel()
+	m_panel(),
+	m_sprite(&m_panel)
 {
 	m_windowWidth = 0;
 	m_windowHeight = 0;
@@ -14,6 +15,7 @@ Display::Display() :
 	m_blendedColor = 0;
 
 	m_closeWindow = false;
+	m_needsUpdate = false;
 	m_extendedMode = false;
 
 	m_activePlane = LSB_PLANE;
@@ -22,47 +24,44 @@ Display::Display() :
 bool Display::Init(
 	const unsigned int windowWidth, const unsigned int windowHeight,
 	const unsigned int displayWidth, const unsigned int displayHeight,
-	const uint32_t backgroundColor, const uint32_t foreground1Color,
-	const uint32_t foreground2Color, const uint32_t blendedColor)
+	const uint16_t backgroundColor, const uint16_t foreground1Color,
+	const uint16_t foreground2Color, const uint16_t blendedColor,
+	const unsigned int panelWidth, const unsigned int panelHeight,
+	const unsigned int panelRotation, const bool rgbOrder,
+	const bool isFlipY)
 {
 	LOG("{Display} Initializing display...");
-	
+
 	m_windowWidth = windowWidth;
 	m_windowHeight = windowHeight;
 	m_displayWidth = displayWidth;
 	m_displayHeight = displayHeight;
-	m_backgroundColor = backgroundColor;
-	m_foreground_1Color = foreground1Color;
-	m_foreground_2Color = foreground2Color;
-	m_blendedColor = blendedColor;
+
+    m_backgroundColor = backgroundColor;
+    m_foreground_1Color = foreground1Color;
+    m_foreground_2Color = foreground2Color;
+    m_blendedColor = blendedColor;
 
 	m_display.resize(displayHeight * displayWidth);
 	m_secondPlane.resize(displayHeight * displayWidth);
-	m_combineBuffer.resize(displayHeight * displayWidth);
 
-	if (!m_panel.Init(m_windowWidth, m_windowHeight)) // Init the bus for the fisical panel
+	if (!m_panel.Init(panelWidth, panelHeight, panelRotation, rgbOrder, isFlipY))
 	{
 		LOG("{Display} ERROR! Failed to initialize physical panel!");
 		return false;
 	}
 
-	m_panel.setRotation(0);
-	m_panel.fillScreen(m_backgroundColor);
-	m_panel.startWrite();
+	m_sprite.setColorDepth(16);
+	m_sprite.createSprite(displayWidth, displayHeight);
 
 	Display::CLS();
 
-	LOG("{Display} Panel Width: %d, Panel Height: %d, Display Width: %d, Display Height: %d", m_windowWidth, m_windowHeight, m_displayWidth, m_displayHeight);
-	LOG("{Display} BackgroundColor: %08X, Foreground1Color: %08X, Foreground2Color: %08X, BlendedColor: %08X", m_backgroundColor, m_foreground_1Color, m_foreground_2Color, m_blendedColor);
-	LOG("{Display} Initialized successfully!");
+	m_panel.startWrite(); // Hold the SPI bus for the lifetime of the session
+	m_panel.fillScreen(m_backgroundColor); // Clear full panel GRAM so borders are clean
 
-	m_panel.fillScreen(0xF800);  // Rojo puro (RGB565)
-vTaskDelay(2000 / portTICK_PERIOD_MS);
-m_panel.fillScreen(0x07E0);  // Verde puro
-vTaskDelay(2000 / portTICK_PERIOD_MS);
-m_panel.fillScreen(0x001F);  // Azul puro
-vTaskDelay(2000 / portTICK_PERIOD_MS);
-m_panel.fillScreen(0x0000);  // Negro
+	LOG("{Display} Panel Width: %d, Panel Height: %d, Display Width: %d, Display Height: %d", m_windowWidth, m_windowHeight, m_displayWidth, m_displayHeight);
+	LOG("{Display} BackgroundColor: %04X, Foreground1Color: %04X, Foreground2Color: %04X, BlendedColor: %04X", m_backgroundColor, m_foreground_1Color, m_foreground_2Color, m_blendedColor);
+	LOG("{Display} Initialized successfully!");
 
 	return true;
 }
@@ -72,7 +71,11 @@ void Display::Update()
 {
 	if (!m_closeWindow)
 	{
-		Render();
+		if (m_needsUpdate)
+		{
+			Render();
+			m_needsUpdate = false;
+		}
 	}
 	else
 	{
@@ -106,11 +109,13 @@ void Display::CLS()
 		break;
 	}
 
-	std::fill(m_combineBuffer.begin(), m_combineBuffer.end(), m_backgroundColor);
+	m_sprite.fillSprite(m_backgroundColor);
+	m_needsUpdate = true;
 }
 
 void Display::ScrollUp(const unsigned int lines)
 {
+	m_needsUpdate = true;
 	for (int i = 0; i < lines; i++)
 	{
 		for (int row = 0; row < m_displayHeight - 1; row++)
@@ -156,6 +161,7 @@ void Display::ScrollUp(const unsigned int lines)
 
 void Display::ScrollDown(const unsigned int lines)
 {
+	m_needsUpdate = true;
 	for (int i = 0; i < lines; i++)
 	{
 		for (int row = m_displayHeight - 1; row > 0; row--)
@@ -196,6 +202,7 @@ void Display::ScrollDown(const unsigned int lines)
 
 void Display::ScrollRight(const unsigned int lines)
 {
+	m_needsUpdate = true;
 	for (int i = 0; i < lines; i++)
 	{
 		for (int row = m_displayHeight - 1; row > 0; row--)
@@ -239,6 +246,7 @@ void Display::ScrollRight(const unsigned int lines)
 
 void Display::ScrollLeft(const unsigned int lines)
 {
+	m_needsUpdate = true;
 	for (int i = 0; i < lines; i++)
 	{
 		for (int col = 0; col < m_displayWidth - 1; col++)
@@ -326,7 +334,7 @@ void Display::ScrollLeft(const unsigned int lines)
 void Display::DrawPixelToCombineBuffer(unsigned int x, unsigned int y, bool planeLSB, bool planeMSB)
 {
 	uint8_t pixelColor = (static_cast<uint8_t>(planeMSB) << 1) | static_cast<uint8_t>(planeLSB);
-	uint32_t selectedColor = 0;
+	uint16_t selectedColor = 0;
 
 	switch (pixelColor)
 	{
@@ -350,13 +358,65 @@ void Display::DrawPixelToCombineBuffer(unsigned int x, unsigned int y, bool plan
 
 	unsigned int offset = m_displayWidth * y + x;
 
-	m_combineBuffer[offset] = selectedColor;
+	((uint16_t*)m_sprite.getBuffer())[offset] = selectedColor;
 }
+
+/*
+void Display::UpdateTexture()
+{
+    const unsigned int scale = std::min(m_windowWidth  / m_displayWidth,
+                                        m_windowHeight / m_displayHeight);
+    const unsigned int offsetY = (m_windowHeight - m_displayHeight * scale) / 2;
+    const unsigned int offsetX = (m_windowWidth  - m_displayWidth  * scale) / 2;
+
+    std::vector<uint16_t> rowBuffer(m_windowWidth, m_backgroundColor);
+
+    for (unsigned int py = 0; py < offsetY; py++)
+    {
+        std::fill(rowBuffer.begin(), rowBuffer.end(), m_backgroundColor);
+        m_panel.pushImage(0, py, m_windowWidth, 1, rowBuffer.data(), m_panel.getColorDepth());
+    }
+
+    for (unsigned int row = 0; row < m_displayHeight; row++)
+    {
+        std::fill(rowBuffer.begin(), rowBuffer.end(), m_backgroundColor);
+        for (unsigned int col = 0; col < m_displayWidth; col++)
+        {
+            uint16_t color = m_combineBuffer[m_displayWidth * row + col];
+            for (unsigned int sx = 0; sx < scale; sx++)
+                rowBuffer[offsetX + col * scale + sx] = color;
+        }
+
+        for (unsigned int sy = 0; sy < scale; sy++)
+        {
+            unsigned int py = offsetY + row * scale + sy;
+            m_panel.pushImage(0, py, m_windowWidth, 1, rowBuffer.data(), m_panel.getColorDepth());
+        }
+    }
+
+    for (unsigned int py = offsetY + m_displayHeight * scale; py < m_windowHeight; py++)
+    {
+        std::fill(rowBuffer.begin(), rowBuffer.end(), m_backgroundColor);
+        m_panel.pushImage(0, py, m_windowWidth, 1, rowBuffer.data(), m_panel.getColorDepth());
+    }
+}
+*/
 
 void Display::UpdateTexture()
 {
-	// Much simplier than before, just set the pixels as they are in the panel.
-	m_panel.pushPixels((const void*)m_combineBuffer.data(), m_displayWidth * m_displayHeight);
+	const float scale = std::min((float)m_windowWidth / m_displayWidth,
+	                             (float)m_windowHeight / m_displayHeight);
+
+	m_panel.pushImageRotateZoom(
+		m_windowWidth  / 2.0f,
+		m_windowHeight / 2.0f,
+		m_displayWidth  / 2.0f,
+		m_displayHeight / 2.0f,
+		0.0f,
+		scale, scale,
+		m_displayWidth, m_displayHeight,
+		(uint16_t*)m_sprite.getBuffer()
+	);
 }
 
 void Display::Render()
@@ -369,6 +429,7 @@ void Display::Render()
 			Display::DrawPixelToCombineBuffer(col, row, m_display[m_displayWidth * row + col], m_secondPlane[m_displayWidth * row + col]);
 		}
 	}
+
 	Display::UpdateTexture();
 }
 
@@ -386,10 +447,14 @@ void Display::SetExtendedMode(const bool enable)
 		m_displayHeight = 32;
 	}
 
-	CLS();
 	m_display.resize(m_displayWidth * m_displayHeight, 0);
 	m_secondPlane.resize(m_displayWidth * m_displayHeight, 0);
-	m_combineBuffer.resize(m_displayWidth * m_displayHeight, 0);
+
+	m_sprite.deleteSprite();
+	m_sprite.createSprite(m_displayWidth, m_displayHeight);
+
+	m_panel.fillScreen(m_backgroundColor);
+	CLS();
 }
 
 const bool Display::GetExtendedMode() const
@@ -469,6 +534,7 @@ bool Display::ChangePixelValue(unsigned int x, unsigned int y, unsigned int col,
 		}
 	}
 
+	m_needsUpdate = true;
 	return conflict;
 
 }
@@ -477,3 +543,5 @@ bool Display::IsWindowClose() const
 {
 	return m_closeWindow;
 }
+
+

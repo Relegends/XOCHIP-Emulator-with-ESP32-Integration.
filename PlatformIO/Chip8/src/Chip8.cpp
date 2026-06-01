@@ -27,7 +27,9 @@ bool Chip8::Init(const std::string& configFilePath)
 		m_config.GetWindowWidth(), m_config.GetWindowHeight(),
 		m_config.GetDisplayWidth(), m_config.GetDisplayHeight(),
 		m_config.GetDisplayBackgroundColor(), m_config.GetDisplayForeground_1Color(),
-		m_config.GetDisplayForeground_2Color(), m_config.GetDisplayBlendedColor())) return false;
+		m_config.GetDisplayForeground_2Color(), m_config.GetDisplayBlendedColor(),
+		m_config.GetPanelWidth(), m_config.GetPanelHeight(),
+		m_config.GetRotation(), m_config.GetRGBOrder(), m_config.GetIsFlipY())) return false;
 	if(!m_audio.Init(m_config.GetAudioFrequency(), m_config.GetAudioSampleRate(), m_config.GetAudioVolume())) return false;
 	//if(!m_keyboard.Init(m_config.GetInputMap())) return false;
 
@@ -261,7 +263,7 @@ uint16_t Chip8::Fetch()
 	return opcode;
 }
 
-std::function<void()> Chip8::Decode(uint16_t opcode)
+void Chip8::Decode(uint16_t opcode)
 {
 	m_decoder.type = (opcode >> 12) & 0x000F;
 	m_decoder.nnn = opcode & 0x0FFF;
@@ -269,7 +271,6 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 	m_decoder.n = opcode & 0x000F;
 	m_decoder.x = (opcode >> 8) & 0x000F;
 	m_decoder.y = (opcode >> 4) & 0x000F;
-
 
 	if (m_decoder.kk != 0x0a && m_logggingMode != LOGGINGMODE::NONE)
 	{
@@ -284,134 +285,84 @@ std::function<void()> Chip8::Decode(uint16_t opcode)
 	case 0x0:
 		switch (m_decoder.y)
 		{
-		case 0xC:
-			return std::bind(&Chip8::Fun_00Cn, this);
-		case 0xD:
-			return std::bind(&Chip8::Fun_00Dn, this);
+		case 0xC: return Fun_00Cn();
+		case 0xD: return Fun_00Dn();
 		}
 		switch (m_decoder.kk)
 		{
-		case 0xE0:
-			return std::bind(&Chip8::Fun_00E0, this);
-		case 0xEE:
-			return std::bind(&Chip8::Fun_00EE, this);
-		case 0xFB:
-			return std::bind(&Chip8::Fun_00FB, this);
-		case 0xFC:
-			return std::bind(&Chip8::Fun_00FC, this);
-		case 0xFE:
-			return std::bind(&Chip8::Fun_00FE, this);
-		case 0xFF:
-			return std::bind(&Chip8::Fun_00FF, this);
+		case 0xE0: return Fun_00E0();
+		case 0xEE: return Fun_00EE();
+		case 0xFB: return Fun_00FB();
+		case 0xFC: return Fun_00FC();
+		case 0xFE: return Fun_00FE();
+		case 0xFF: return Fun_00FF();
 		}
 		break;
-	case 0x1:
-		return std::bind(&Chip8::Fun_1nnn, this);
-	case 0x2:
-		return std::bind(&Chip8::Fun_2nnn, this);
-	case 0x3:
-		return std::bind(&Chip8::Fun_3xkk, this);
-	case 0x4:
-		return std::bind(&Chip8::Fun_4xkk, this);
+	case 0x1: return Fun_1nnn();
+	case 0x2: return Fun_2nnn();
+	case 0x3: return Fun_3xkk();
+	case 0x4: return Fun_4xkk();
 	case 0x5:
 		switch (m_decoder.n)
 		{
-		case 0x0:
-			return std::bind(&Chip8::Fun_5xy0, this);
-		case 0x2:
-			return std::bind(&Chip8::Fun_5xy2, this);
-		case 0x3:
-			return std::bind(&Chip8::Fun_5xy3, this);
+		case 0x0: return Fun_5xy0();
+		case 0x2: return Fun_5xy2();
+		case 0x3: return Fun_5xy3();
 		}
 		break;
-	case 0x6:
-		return std::bind(&Chip8::Fun_6xkk, this);
-	case 0x7:
-		return std::bind(&Chip8::Fun_7xkk, this);
+	case 0x6: return Fun_6xkk();
+	case 0x7: return Fun_7xkk();
 	case 0x8:
 		switch (m_decoder.n)
 		{
-		case 0x0:
-			return std::bind(&Chip8::Fun_8xy0, this);
-		case 0x1:
-			return std::bind(&Chip8::Fun_8xy1, this);
-		case 0x2:
-			return std::bind(&Chip8::Fun_8xy2, this);
-		case 0x3:
-			return std::bind(&Chip8::Fun_8xy3, this);
-		case 0x4:
-			return std::bind(&Chip8::Fun_8xy4, this);
-		case 0x5:
-			return std::bind(&Chip8::Fun_8xy5, this);
-		case 0x6:
-			return std::bind(&Chip8::Fun_8xy6, this);
-		case 0x7:
-			return std::bind(&Chip8::Fun_8xy7, this);
-		case 0xE:
-			return std::bind(&Chip8::Fun_8xyE, this);
+		case 0x0: return Fun_8xy0();
+		case 0x1: return Fun_8xy1();
+		case 0x2: return Fun_8xy2();
+		case 0x3: return Fun_8xy3();
+		case 0x4: return Fun_8xy4();
+		case 0x5: return Fun_8xy5();
+		case 0x6: return Fun_8xy6();
+		case 0x7: return Fun_8xy7();
+		case 0xE: return Fun_8xyE();
 		}
 		break;
-	case 0x9:
-		return std::bind(&Chip8::Fun_9xy0, this);
-	case 0xA:
-		return std::bind(&Chip8::Fun_Annn, this);
-	case 0xB:
-		return std::bind(&Chip8::Fun_Bnnn, this);
-	case 0xC:
-		return std::bind(&Chip8::Fun_Cxkk, this);
-	case 0xD:
-		return std::bind(&Chip8::Fun_Dxyn, this);
+	case 0x9: return Fun_9xy0();
+	case 0xA: return Fun_Annn();
+	case 0xB: return Fun_Bnnn();
+	case 0xC: return Fun_Cxkk();
+	case 0xD: return Fun_Dxyn();
 	case 0xE:
 		switch (m_decoder.kk)
 		{
-		case 0x9E:
-			return std::bind(&Chip8::Fun_Ex9E, this);
-		case 0xA1:
-			return std::bind(&Chip8::Fun_ExA1, this);
+		case 0x9E: return Fun_Ex9E();
+		case 0xA1: return Fun_ExA1();
 		}
 		break;
 	case 0xF:
 		switch (m_decoder.kk)
 		{
-		case 0x00:
-			return std::bind(&Chip8::Fun_F000, this);
-		case 0x02:
-			return std::bind(&Chip8::Fun_F002, this);
-		case 0x01:
-			return std::bind(&Chip8::Fun_Fx01, this);
-		case 0x07:
-			return std::bind(&Chip8::Fun_Fx07, this);
-		case 0x0A:
-			return std::bind(&Chip8::Fun_Fx0A, this);
-		case 0x15:
-			return std::bind(&Chip8::Fun_Fx15, this);
-		case 0x18:
-			return std::bind(&Chip8::Fun_Fx18, this);
-		case 0x1E:
-			return std::bind(&Chip8::Fun_Fx1E, this);
-		case 0x29:
-			return std::bind(&Chip8::Fun_Fx29, this);
-		case 0x30:
-			return std::bind(&Chip8::Fun_Fx30, this);
-		case 0x33:
-			return std::bind(&Chip8::Fun_Fx33, this);
-		case 0x3A:
-			return std::bind(&Chip8::Fun_Fx3A, this);
-		case 0x55:
-			return std::bind(&Chip8::Fun_Fx55, this);
-		case 0x65:
-			return std::bind(&Chip8::Fun_Fx65, this);
-		case 0x75:
-			return std::bind(&Chip8::Fun_Fx75, this);
-		case 0x85:
-			return std::bind(&Chip8::Fun_Fx85, this);
+		case 0x00: return Fun_F000();
+		case 0x01: return Fun_Fx01();
+		case 0x02: return Fun_F002();
+		case 0x07: return Fun_Fx07();
+		case 0x0A: return Fun_Fx0A();
+		case 0x15: return Fun_Fx15();
+		case 0x18: return Fun_Fx18();
+		case 0x1E: return Fun_Fx1E();
+		case 0x29: return Fun_Fx29();
+		case 0x30: return Fun_Fx30();
+		case 0x33: return Fun_Fx33();
+		case 0x3A: return Fun_Fx3A();
+		case 0x55: return Fun_Fx55();
+		case 0x65: return Fun_Fx65();
+		case 0x75: return Fun_Fx75();
+		case 0x85: return Fun_Fx85();
 		}
 		break;
 	}
 
-	// If the opcode does not exit -> ERROR
 	printf("ERROR: Decoded opcode not implemented! OPCODE: %.4X\n", opcode);
-	exit(-1);
+	abort();
 }
 
 void Chip8::SkipNextInstruction()
@@ -459,10 +410,7 @@ bool Chip8::LoadGame(const std::string& gameName)
 
 void Chip8::Simulate_Cycle()
 {
-	uint16_t opcode = Chip8::Fetch();
-	std::function<void()> ExecuteNextInstruction = Chip8::Decode(opcode);
-
-	ExecuteNextInstruction();
+	Chip8::Decode(Chip8::Fetch());
 }
 
 void Chip8::Run()
@@ -471,29 +419,39 @@ void Chip8::Run()
 	const float targetFPS = 60.0f;
 	const float targetTimeBtwFrames = 1000.0f / targetFPS;
 	const TickType_t framePeriod = static_cast<TickType_t>(targetTimeBtwFrames / portTICK_PERIOD_MS);
-
 	TickType_t lastFrameTick = xTaskGetTickCount();
+	const int64_t frameBudgetUs = 1000000LL / 60; // 16 667 µs
+	unsigned int displayFrame = 0;
 
 	while (!m_display.IsWindowClose())
 	{
 		//m_keyboard.ProcessInput();
+		int64_t frameStart   = esp_timer_get_time();
+		int64_t frameDeadline = frameStart + frameBudgetUs;
 
-		while (m_instructionCount < m_ipf)
+		int64_t displayUs = 0;
+		if (++displayFrame >= 2)
+		{
+			int64_t t0 = esp_timer_get_time();
+			m_display.Update();
+			displayUs = esp_timer_get_time() - t0;
+			displayFrame = 0;
+		}
+
+		m_instructionCount = 0;
+		while (esp_timer_get_time() < frameDeadline)
 		{
 			Simulate_Cycle();
 			m_instructionCount++;
 		}
-		m_instructionCount = 0;
 
 		//m_keyboard.SavePreviousInputs();
 
-		m_display.Update();
-
+		LOG("{Chip8} INS: %d  DISP: %lldus  FRAME: %lldus",
+		    m_instructionCount, displayUs, esp_timer_get_time() - frameStart);
 		UpdateTimers();
-
 		vTaskDelayUntil(&lastFrameTick, framePeriod);
 	}
-
 	m_audio.Close();
 }
 

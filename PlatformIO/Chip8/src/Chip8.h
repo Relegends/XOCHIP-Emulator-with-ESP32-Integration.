@@ -7,6 +7,7 @@
 #include <iostream>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include "esp_task_wdt.h"
 
 #include "Display.h"
 #include "Audio.h"
@@ -38,7 +39,7 @@ private:
 	void UpdateTimers();
 
 	uint16_t Fetch();
-	std::function<void()> Decode(uint16_t opcode);
+	void Decode(uint16_t opcode);
 
 	void SkipNextInstruction();
 

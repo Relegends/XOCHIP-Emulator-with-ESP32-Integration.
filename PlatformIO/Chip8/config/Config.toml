@@ -1,0 +1,59 @@
+#Logging: 0 = No Logging * 1 = Chip8 Logging * 2 = Octo Logging
+[Logging]
+Log = 0
+
+# Interpreter: VIP = 0 * SCHIP = 1 * OCTO = 2 * XOChip = 3
+[InterpreterMode]
+interpreter = 3
+
+#Quirks Values: -1 = Default by Interpreter, 0 = OFF, 1 = 0N
+[Quirks]
+VFreset = -1
+Memory = -1
+DisplayWait = -1
+Clipping = -1
+Shifting = -1
+Jumping = -1
+
+[IPF]
+IPF = 10000
+
+[Display]
+windowResolution = [320, 240]
+displayResolution = [64, 32]
+backgroundColor = 0xF7DE
+foreground1Color = 0x1B05
+foreground2Color = 0xB6E9
+blendedColor = 0xB6E9
+
+[Panel]
+panelResolution = [240, 320]
+rotation = 1
+rgbOrder = 0
+flipY = 0
+
+[Audio]
+frequency = 440
+sampleRate = 44100
+volume = 10
+
+[Keyboard]
+1 = ["Key_1", 0]
+2 = ["Key_2", 1]
+3 = ["Key_3", 2]
+C = ["Key_C", 3]
+4 = ["Key_4", 4]
+5 = ["Key_5", 5]
+6 = ["Key_6", 6]
+D = ["Key_D", 7]
+7 = ["Key_7", 8]
+8 = ["Key_8", 9]
+9 = ["Key_9", 10]
+E = ["Key_E", 11]
+A = ["Key_A", 12]
+0 = ["Key_0", 13]
+B = ["Key_B", 14]
+F = ["Key_F", 15]
+
+[UserFlags]
+userFlags = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]

@@ -21,8 +21,8 @@ bool Keyboard::Init(const std::vector<std::pair<std::string, int>> &keyboardConf
 
 	i2c_master_bus_config_t bus_cfg = {
         .i2c_port = I2C_NUM_0,
-        .sda_io_num = GPIO_NUM_27,
-        .scl_io_num = GPIO_NUM_26,
+        .sda_io_num = GPIO_NUM_22,
+        .scl_io_num = GPIO_NUM_27,
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .glitch_ignore_cnt = 7,
         .flags = {
@@ -38,7 +38,7 @@ bool Keyboard::Init(const std::vector<std::pair<std::string, int>> &keyboardConf
 
 	i2c_device_config_t dev_cfg = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address = 0x24,   // MCP23017 address
+        .device_address = 0x20,   // MCP23017 address
         .scl_speed_hz = 10000,
     };
 
@@ -48,11 +48,16 @@ bool Keyboard::Init(const std::vector<std::pair<std::string, int>> &keyboardConf
 		return false;
 	}
 
+	vTaskDelay(pdMS_TO_TICKS(100));
+
 	// Config MCP23017
 	if (!WriteI2CRegister(MCP23017_IODIRA, 0xFF) || !WriteI2CRegister(MCP23017_IODIRB, 0xFF)) {
 		LOGE("{Keyboard}Failed to set I/O direction for MCP23017");
 		return false;
 	}
+
+	vTaskDelay(pdMS_TO_TICKS(100));
+
 	if (!WriteI2CRegister(MCP23017_GPPUA, 0xFF) || !WriteI2CRegister(MCP23017_GPPUB, 0xFF)) {
 		LOGE("{Keyboard} Failed to enable pull-up resistors for MCP23017");
 		return false;
@@ -119,11 +124,11 @@ int Keyboard::ReadKeyboard(const unsigned int position)
 bool Keyboard::ReadI2CRegister(uint8_t reg, uint8_t *data)
 {
     uint8_t write_buf[1] = { reg };
-    return i2c_master_transmit_receive(m_i2cDevice, write_buf, 1, data, 1, pdMS_TO_TICKS(100)) == ESP_OK;
+    return i2c_master_transmit_receive(m_i2cDevice, write_buf, 1, data, 1, pdMS_TO_TICKS(500)) == ESP_OK;
 }
 
 bool Keyboard::WriteI2CRegister(uint8_t reg, uint8_t data)
 {
 	uint8_t buf[2] = { reg, data };
-    return i2c_master_transmit(m_i2cDevice, buf, 2, pdMS_TO_TICKS(100)) == ESP_OK;
+    return i2c_master_transmit(m_i2cDevice, buf, 2, pdMS_TO_TICKS(500)) == ESP_OK;
 }

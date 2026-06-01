@@ -108,12 +108,12 @@ int Configuration::GetIPF() const
 
 unsigned int Configuration::GetWindowWidth() const
 {
-	return m_config["Display"]["windowResolution"][0].value_or(1920);
+	return m_config["Display"]["windowResolution"][0].value_or(320);
 }
 
 unsigned int Configuration::GetWindowHeight() const
 {
-	return m_config["Display"]["windowResolution"][1].value_or(1080);
+	return m_config["Display"]["windowResolution"][1].value_or(240);
 }
 
 unsigned int Configuration::GetDisplayWidth() const
@@ -126,24 +126,34 @@ unsigned int Configuration::GetDisplayHeight() const
 	return m_config["Display"]["displayResolution"][1].value_or(32);
 }
 
-uint32_t Configuration::GetDisplayBackgroundColor() const
+unsigned int Configuration::GetPanelWidth() const
 {
-	return m_config["Display"]["backgroundColor"].value_or<uint32_t>(0x996600);
+    return m_config["Panel"]["panelResolution"][0].value_or(320);
 }
 
-uint32_t Configuration::GetDisplayForeground_1Color() const
+unsigned int Configuration::GetPanelHeight() const
 {
-	return m_config["Display"]["foreground1Color"].value_or<uint32_t>(0xFFCC00);
+    return m_config["Panel"]["panelResolution"][1].value_or(240);
 }
 
-uint32_t Configuration::GetDisplayForeground_2Color() const
+uint16_t Configuration::GetDisplayBackgroundColor() const
 {
-	return m_config["Display"]["foreground2Color"].value_or<uint32_t>(0xFF6600);
+	return m_config["Display"]["backgroundColor"].value_or<uint16_t>(0xF7DE);
 }
 
-uint32_t Configuration::GetDisplayBlendedColor() const
+uint16_t Configuration::GetDisplayForeground_1Color() const
 {
-	return m_config["Display"]["blendedColor"].value_or<uint32_t>(0x662200);
+	return m_config["Display"]["foreground1Color"].value_or<uint16_t>(0x1B05);
+}
+
+uint16_t Configuration::GetDisplayForeground_2Color() const
+{
+	return m_config["Display"]["foreground2Color"].value_or<uint16_t>(0xB6E9);
+}
+
+uint16_t Configuration::GetDisplayBlendedColor() const
+{
+	return m_config["Display"]["blendedColor"].value_or<uint16_t>(0xB6E9);
 }
 
 unsigned int Configuration::GetAudioFrequency() const
@@ -158,7 +168,22 @@ unsigned int Configuration::GetAudioSampleRate() const
 
 unsigned int Configuration::GetAudioVolume() const
 {
-	return m_config["Audio"]["volume"].value_or(3000);
+	return m_config["Audio"]["volume"].value_or(10);
+}
+
+unsigned int Configuration::GetRotation() const
+{
+    return m_config["Panel"]["rotation"].value_or(0);
+}
+
+bool Configuration::GetRGBOrder() const
+{
+    return m_config["Panel"]["rgbOrder"].value_or(0);
+}
+
+bool Configuration::GetIsFlipY() const
+{
+    return m_config["Panel"]["flipY"].value_or(0);
 }
 
 std::vector<std::pair<std::string, int>> Configuration::GetInputMap() const

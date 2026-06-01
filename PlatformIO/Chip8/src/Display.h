@@ -20,12 +20,18 @@ public:
 	bool Init(
 		const unsigned int windowWidth, const unsigned int windowHeight,
 		const unsigned int displayWidth, const unsigned int displayHeight,
-		const uint32_t backgroundColor, const uint32_t foreground1Color,
-		const uint32_t foreground2Color, const uint32_t blendedColor);
+		const uint16_t backgroundColor, const uint16_t foreground1Color,
+		const uint16_t foreground2Color, const uint16_t blendedColor,
+		const unsigned int panelWidth, const unsigned int panelHeight,
+		const unsigned int panelRotation, const bool rgbOrder,
+		const bool isFlipY
+	);
 	void Update();
 	void Close();
 
 	void CLS();	// Clear Screen
+
+	void SwapBuffers();
 
 	void ScrollUp(const unsigned int lines);
 	void ScrollDown(const unsigned int lines);
@@ -51,23 +57,23 @@ private:
 	unsigned int m_windowHeight;
 	unsigned int m_windowWidth;
 
-	uint32_t m_backgroundColor;
-	uint32_t m_foreground_1Color;
-	uint32_t m_foreground_2Color;
-	uint32_t m_blendedColor;
-	
+	uint16_t m_backgroundColor;
+	uint16_t m_foreground_1Color;
+	uint16_t m_foreground_2Color;
+	uint16_t m_blendedColor;
+
 	bool m_closeWindow;
+	bool m_needsUpdate;
 
 	unsigned int m_displayWidth;
 	unsigned int m_displayHeight;
 
 	bool m_extendedMode;
 
-	std::string m_windowName;
-
 	std::vector<bool> m_display;
 	std::vector<bool> m_secondPlane;
-	std::vector<uint32_t> m_combineBuffer;
+
+	lgfx::LGFX_Sprite m_sprite;
 
 	FisicalPanel m_panel;
 
