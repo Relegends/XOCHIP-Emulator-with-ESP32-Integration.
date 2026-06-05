@@ -39,6 +39,11 @@ public:
 
 
 
+	std::string GetNetworkDeviceName()  const;
+	uint8_t     GetNetworkWifiChannel() const;
+	std::string GetNetworkSSID()        const;
+	std::string GetNetworkPassword()    const;
+
 	std::vector<std::pair<std::string, int>> GetInputMap() const;
 
 	std::vector<int> GetRPLUserFlags() const;

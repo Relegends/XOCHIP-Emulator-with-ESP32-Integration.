@@ -57,3 +57,10 @@ F = ["Key_F", 15]
 
 [UserFlags]
 userFlags = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+# WiFi channel 1-13; all devices must match
+[Network]
+deviceName = "CHIP8-1"
+wifiChannel = 6
+ssid = "CHIP8NET"
+password = "chip8play" # WPA2 password (min 8 chars)

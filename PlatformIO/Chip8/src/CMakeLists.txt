@@ -11,4 +11,7 @@ idf_component_register(
         driver
         fatfs
         sdmmc
+        esp_wifi
+        esp_netif
+        lwip
 )

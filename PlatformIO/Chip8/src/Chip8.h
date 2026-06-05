@@ -12,6 +12,7 @@
 #include "Display.h"
 #include "Audio.h"
 #include "Keyboard.h"
+#include "Network.h"
 #include "Configuration.h"
 #include "Log.h"
 
@@ -92,7 +93,17 @@ private:
 	void Fun_Fx65(); // LD Vx, [I]
 	void Fun_Fx75(); // LD R, VX
 	void Fun_Fx85(); // LD VX, R
-	
+
+	void Fun_FxA0(); // NET HOST
+	void Fun_FxA1(); // NET JOIN
+	void Fun_FxA2(); // NET DISCO
+	void Fun_FxA3(); // NET SEND
+	void Fun_FxA4(); // NET RECV
+	void Fun_FxA5(); // NET STAT  (Vx = destination)
+	void Fun_FxA6(); // NET PEERS (Vx = destination)
+	void Fun_FxA7(); // NET PID   (Vx = destination)
+	void Fun_FxA8(); // NET WAIT
+
 private:
 	std::array<uint8_t, 16> m_V;
 	std::array<uint8_t, 0x10000> m_memory;
@@ -107,10 +118,11 @@ private:
 	uint8_t m_delayTimer;
 	uint8_t m_soundTimer;
 
-	Configuration m_config;	
+	Configuration m_config;
 	Display m_display;
 	Keyboard m_keyboard;
 	Audio m_audio;
+	Network m_network;
 
 	struct OPCODE_DECO
 	{

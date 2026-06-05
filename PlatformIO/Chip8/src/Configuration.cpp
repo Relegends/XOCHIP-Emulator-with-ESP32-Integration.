@@ -186,6 +186,31 @@ bool Configuration::GetIsFlipY() const
     return m_config["Panel"]["flipY"].value_or(0);
 }
 
+std::string Configuration::GetNetworkDeviceName() const
+{
+	auto val = m_config["Network"]["deviceName"].value_or("CHIP8-1");
+	return std::string(val);
+}
+
+uint8_t Configuration::GetNetworkWifiChannel() const
+{
+	int ch = m_config["Network"]["wifiChannel"].value_or(6);
+	if (ch < 1 || ch > 13) ch = 6;
+	return static_cast<uint8_t>(ch);
+}
+
+std::string Configuration::GetNetworkSSID() const
+{
+	auto val = m_config["Network"]["ssid"].value_or("CHIP8NET");
+	return std::string(val);
+}
+
+std::string Configuration::GetNetworkPassword() const
+{
+	auto val = m_config["Network"]["password"].value_or("chip8play");
+	return std::string(val);
+}
+
 std::vector<std::pair<std::string, int>> Configuration::GetInputMap() const
 {
 	auto tbl = m_config["Keyboard"].as_table();

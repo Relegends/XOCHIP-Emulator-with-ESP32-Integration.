@@ -10,6 +10,7 @@ Chip8::Chip8() :
 	m_display(),
 	m_audio(),
 	m_keyboard(),
+	m_network(),
 	m_decoder({ 0 }),
 	m_interpreter(INTERPRETER::XOCHIP),
 	m_instructionCount(0),
@@ -31,6 +32,7 @@ bool Chip8::Init(const std::string& configFilePath)
 		m_config.GetPanelWidth(), m_config.GetPanelHeight(),
 		m_config.GetRotation(), m_config.GetRGBOrder(), m_config.GetIsFlipY())) return false;
 	if(!m_audio.Init(m_config.GetAudioFrequency(), m_config.GetAudioSampleRate(), m_config.GetAudioVolume())) return false;
+	if(!m_network.Init(m_config.GetNetworkDeviceName(), m_config.GetNetworkWifiChannel())) return false;
 	//if(!m_keyboard.Init(m_config.GetInputMap())) return false;
 
 	m_V = { 0 };
@@ -272,7 +274,7 @@ void Chip8::Decode(uint16_t opcode)
 	m_decoder.x = (opcode >> 8) & 0x000F;
 	m_decoder.y = (opcode >> 4) & 0x000F;
 
-	if (m_decoder.kk != 0x0a && m_logggingMode != LOGGINGMODE::NONE)
+	if (m_decoder.kk != 0x0a && m_decoder.kk != 0xa8 && m_logggingMode != LOGGINGMODE::NONE)
 	{
 		LOG("I = 0x%.4X ", m_indexRegister);
 		for (uint8_t i = 0; i < m_V.size(); i++)
@@ -357,6 +359,15 @@ void Chip8::Decode(uint16_t opcode)
 		case 0x65: return Fun_Fx65();
 		case 0x75: return Fun_Fx75();
 		case 0x85: return Fun_Fx85();
+		case 0xA0: return Fun_FxA0();
+		case 0xA1: return Fun_FxA1();
+		case 0xA2: return Fun_FxA2();
+		case 0xA3: return Fun_FxA3();
+		case 0xA4: return Fun_FxA4();
+		case 0xA5: return Fun_FxA5();
+		case 0xA6: return Fun_FxA6();
+		case 0xA7: return Fun_FxA7();
+		case 0xA8: return Fun_FxA8();
 		}
 		break;
 	}
@@ -1572,5 +1583,219 @@ void Chip8::Fun_Fx85()
 	default:
 		std::exit(-1);
 		break;
+	}
+}
+
+/*
+F0A0 - NET HOST
+Host a multiplayer session. Creates a SoftAP and opens a UDP socket.
+VF = 1 on success, 0 on failure.
+*/
+void Chip8::Fun_FxA0()
+{
+	if (m_interpreter != XOCHIP) {
+		LOGE("{Chip8} NET HOST called in non-XOCHIP mode!");
+		abort();
+	}
+
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("NET HOST\n"); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG:  LOG("net-host\n"); break;
+	}
+
+	bool ok = m_network.Host(m_config.GetNetworkSSID(), m_config.GetNetworkPassword());
+	m_V[0xF] = ok ? 1 : 0;
+}
+
+/*
+F0A1 - NET JOIN
+Join a hosted session as a client. Blocks until connected or handshake times out.
+VF = 1 on success, 0 on failure/timeout.
+*/
+void Chip8::Fun_FxA1()
+{
+	if (m_interpreter != XOCHIP) {
+		LOGE("{Chip8} NET JOIN called in non-XOCHIP mode!");
+		abort();
+	}
+
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("NET JOIN\n"); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG:  LOG("net-join\n"); break;
+	}
+
+	bool ok = m_network.Join(m_config.GetNetworkSSID(), m_config.GetNetworkPassword());
+	m_V[0xF] = ok ? 1 : 0;
+}
+
+/*
+F0A2 - NET DISCO
+Disconnect from the current session and tear down WiFi.
+*/
+void Chip8::Fun_FxA2()
+{
+	if (m_interpreter != XOCHIP) {
+		LOGE("{Chip8} NET DISCO called in non-XOCHIP mode!");
+		abort();
+	}
+
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("NET DISCO\n"); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG:  LOG("net-disconnect\n"); break;
+	}
+
+	m_network.Disconnect();
+}
+
+/*
+F0A3 - NET SEND
+Send 16 bytes starting at [I] to all peers.
+VF = 1 on success, 0 if disconnected or send failed.
+*/
+void Chip8::Fun_FxA3()
+{
+	if (m_interpreter != XOCHIP) {
+		LOGE("{Chip8} NET SEND called in non-XOCHIP mode!");
+		abort();
+	}
+
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("NET SEND\n"); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG:  LOG("net-send\n"); break;
+	}
+
+	bool ok = m_network.Send(&m_memory[m_indexRegister], NET_PAYLOAD_SIZE);
+	m_V[0xF] = ok ? 1 : 0;
+}
+
+/*
+F0A4 - NET RECV
+Read the oldest received packet into [I..I+15] (payload) and [I+16] (sender player_id).
+VF = 1 if a packet was available, 0 if the queue was empty.
+*/
+void Chip8::Fun_FxA4()
+{
+	if (m_interpreter != XOCHIP) {
+		LOGE("{Chip8} NET RECV called in non-XOCHIP mode!");
+		abort();
+	}
+
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("NET RECV\n"); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG:  LOG("net-recv\n"); break;
+	}
+
+	NetworkPacket pkt;
+	if (m_network.Receive(pkt)) {
+		for (size_t i = 0; i < NET_PAYLOAD_SIZE; i++)
+			m_memory[m_indexRegister + i] = pkt.payload[i];
+		m_memory[m_indexRegister + NET_PAYLOAD_SIZE] = pkt.playerID;
+		m_V[0xF] = 1;
+	} else {
+		m_V[0xF] = 0;
+	}
+}
+
+/*
+FxA5 - NET STAT
+Store a network status byte into Vx.
+Bit 7: connected, Bit 6: role (1=HOST), Bits 3-2: peer count, Bits 1-0: player_id - 1.
+*/
+void Chip8::Fun_FxA5()
+{
+	if (m_interpreter != XOCHIP) {
+		LOGE("{Chip8} NET STAT called in non-XOCHIP mode!");
+		abort();
+	}
+
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("NET STAT V%X\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG:  LOG("net-stat v%X\n", m_decoder.x); break;
+	}
+
+	uint8_t status = 0;
+	if (m_network.IsConnected())
+		status |= 0x80;
+	if (m_network.GetRole() == Network::NETWORK_ROLE::HOST)
+		status |= 0x40;
+	status |= (m_network.GetPeerCount() & 0x03) << 2;
+	uint8_t pid = m_network.GetPlayerID();
+	if (pid > 0)
+		status |= (pid - 1) & 0x03;
+
+	m_V[m_decoder.x] = status;
+}
+
+/*
+FxA6 - NET PEERS
+Store the number of connected remote peers (0-2) into Vx.
+*/
+void Chip8::Fun_FxA6()
+{
+	if (m_interpreter != XOCHIP) {
+		LOGE("{Chip8} NET PEERS called in non-XOCHIP mode!");
+		abort();
+	}
+
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("NET PEERS V%X\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG:  LOG("net-peers v%X\n", m_decoder.x); break;
+	}
+
+	m_V[m_decoder.x] = m_network.GetPeerCount();
+}
+
+/*
+FxA7 - NET PID
+Store this device's player ID (1-3) into Vx. Returns 0 if not connected.
+*/
+void Chip8::Fun_FxA7()
+{
+	if (m_interpreter != XOCHIP) {
+		LOGE("{Chip8} NET PID called in non-XOCHIP mode!");
+		abort();
+	}
+
+	switch (m_logggingMode)
+	{
+	case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("NET PID V%X\n", m_decoder.x); break;
+	case Chip8::LOGGINGMODE::OCTO_LOG:  LOG("net-pid v%X\n", m_decoder.x); break;
+	}
+
+	m_V[m_decoder.x] = m_network.GetPlayerID();
+}
+
+/*
+F0A8 - NET WAIT
+Stall execution (like Fx0A) until a packet arrives in the receive queue
+or the delay timer reaches 0.
+VF = 1 if woken by a packet, 0 if timed out.
+*/
+void Chip8::Fun_FxA8()
+{
+	if (m_interpreter != XOCHIP) {
+		LOGE("{Chip8} NET WAIT called in non-XOCHIP mode!");
+		abort();
+	}
+
+	bool hasData  = m_network.HasPending();
+	bool timedOut = (m_delayTimer == 0);
+
+	if (hasData || timedOut) {
+		switch (m_logggingMode)
+		{
+		case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("NET WAIT (done)\n"); break;
+		case Chip8::LOGGINGMODE::OCTO_LOG:  LOG("net-wait (done)\n"); break;
+		}
+		m_V[0xF] = hasData ? 1 : 0;
+	} else {
+		m_pc -= 2; // Retry next cycle, exactly like Fx0A
 	}
 }
