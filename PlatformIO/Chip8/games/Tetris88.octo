@@ -1,0 +1,1391 @@
+# ----------------------- NETWORK OPCODES ---------------------------
+:macro net-host        { 0xF0 0xA0 }
+:macro net-join        { 0xF0 0xA1 }
+:macro net-disconnect  { 0xF0 0xA2 }
+:macro net-send        { 0xF0 0xA3 }
+:macro net-recv        { 0xF0 0xA4 }
+:macro net-stat  DEST  { :calc hi { 0xF0 | DEST }  hi 0xA5 }
+:macro net-peers DEST  { :calc hi { 0xF0 | DEST }  hi 0xA6 }
+:macro net-pid   DEST  { :calc hi { 0xF0 | DEST }  hi 0xA7 }
+:macro net-wait        { 0xF0 0xA8 }
+
+# ----------------------- ALIASES ---------------------------
+:alias ioRegister v0
+:alias boardX     vA
+:alias boardY     vB
+:alias screenX    vC
+:alias screenY    vD
+:alias tempSave   vE
+
+
+# ----------------------- CONSTANTS ---------------------------
+:const BOARD_WIDTH        10
+:const BOARD_HEIGHT       20
+:const CELL_WIDTH         5
+:const CELL_HEIGHT        3
+:const BOARD_X            1
+:const BOARD_Y            2
+:const PIECE_GRAVITY      45
+:const SOFT_RATE          3
+
+# Cells
+:const CELL_EMPTY         0
+:const CELL_PLAYER        1
+:const CELL_ENEMY_A       2
+:const CELL_ENEMY_B       3
+
+# Planes
+:const PLANE_NONE         0
+:const PLANE_PLAYER       1
+:const PLANE_ENEMY_A      2
+:const PLANE_ENEMY_B      3
+
+# Input
+:const KEY_LEFT           4
+:const KEY_RIGHT          6
+:const KEY_ROTATE         8
+:const KEY_SOFT_DROP      2
+:const KEY_HARD_DROP      5
+:const INPUT_HOLD_DELAY   16
+:const INPUT_REPEAT_RATE  4
+
+# Network
+:const MSG_GARBAGE        1
+:const MSG_GAMEOVER       2
+:const DISCONNECT_ID      0xFF
+
+:calc BORDER_LEFT_X     { BOARD_X - 1 }
+:calc BORDER_RIGHT_X    { BOARD_X + BOARD_WIDTH * CELL_WIDTH }
+:calc BORDER_BOTTOM     { BOARD_Y + BOARD_HEIGHT * CELL_HEIGHT }
+
+# ----------------------- MEMORY ---------------------------
+:org 0x300
+
+: board
+  0 0 0 0 0 0 0 0 0 0   # row  0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0   # row 19 (bottom)
+
+: currentPieceX       0
+: currentPieceY       0
+: pieceType           0
+: pieceRotation       0
+: nextPiece           0
+: gravityCounter      0
+: linesCount          0
+: scoreHi             0
+: scoreLo             0
+: garbageRows         0
+: garbageSource       0
+: garbageHole         0
+: playerId            0
+: gameOverFlag        0
+: aliveMask           0
+: keyRotPrev          0
+: keyHardDropPrev     0
+: inputRepeatCounter  0
+: softDropOn          0
+
+: net-tx  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+: net-rx  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+
+# ----------------------- SPRITES ---------------------------
+: spr-1
+  0x20 0x60 0x20 0x20 0x70
+
+: spr-2
+  0x70 0x10 0x70 0x40 0x70
+
+: cellSprite
+  0xF8 0xF8 0xF8
+
+: vLineSprite
+  0x80
+
+: nextCellSprite
+  0xC0 0xC0
+
+: sprH  0xA0 0xA0 0xE0 0xA0 0xA0 
+: sprO  0x40 0xA0 0xA0 0xA0 0x40 
+: sprS  0xE0 0x80 0xE0 0x20 0xE0
+: sprT  0xE0 0x40 0x40 0x40 0x40
+: sprJ  0xE0 0x40 0x40 0x40 0xC0
+: sprI  0xE0 0x40 0x40 0x40 0xE0
+: sprN  0x90 0xD0 0xF0 0xB0 0x90
+
+# Pieces and rotations
+: pieces
+  # I
+  0x00 0xF0 0x00 0x00
+  0x40 0x40 0x40 0x40
+  0x00 0xF0 0x00 0x00
+  0x40 0x40 0x40 0x40
+  # O
+  0x00 0x60 0x60 0x00
+  0x00 0x60 0x60 0x00
+  0x00 0x60 0x60 0x00
+  0x00 0x60 0x60 0x00
+  # T
+  0x00 0xE0 0x40 0x00
+  0x40 0xC0 0x40 0x00
+  0x40 0xE0 0x00 0x00
+  0x40 0x60 0x40 0x00
+  # S
+  0x00 0x60 0xC0 0x00
+  0x80 0xC0 0x40 0x00
+  0x00 0x60 0xC0 0x00
+  0x80 0xC0 0x40 0x00
+  # Z
+  0x00 0xC0 0x60 0x00
+  0x40 0xC0 0x80 0x00
+  0x00 0xC0 0x60 0x00
+  0x40 0xC0 0x80 0x00
+  # J
+  0x80 0xE0 0x00 0x00
+  0x60 0x40 0x40 0x00
+  0xE0 0x20 0x00 0x00
+  0x40 0x40 0xC0 0x00
+  # L
+  0x20 0xE0 0x00 0x00
+  0x40 0x40 0x60 0x00
+  0xE0 0x80 0x00 0x00
+  0xC0 0x40 0x40 0x00
+
+# ----------------------- MAIN ---------------------------
+: main
+  hires
+  v0 := 7
+  i := aliveMask
+  save v0
+
+: restart
+  lobby
+  initGame
+  jump gameLoop
+
+# ----------------------- LOBBY ---------------------------
+: lobby
+  clear
+  plane PLANE_PLAYER
+
+  # Draw 1
+  v0 := 20
+  v1 := 10
+  i := spr-1
+  sprite v0 v1 5
+
+  # Draw 2
+  v0 := 70
+  v1 := 10
+  i := spr-2
+  sprite v0 v1 5
+
+  drawHOST
+  drawJOIN
+
+  # Vertical separator line
+  v2 := 64   v3 := 0
+  : loopLobbyVline
+    i := vLineSprite
+    sprite v2 v3 1
+    v3 += 1
+    if v3 < 64 then jump loopLobbyVline
+
+  : loopLobby
+    v1 := 1
+    v2 := 2
+    if v1 key then jump lobbyConnectHost
+    if v2 key then jump lobbyConnectJoin
+    jump loopLobby
+
+: lobbyConnectHost
+  net-host
+  if vF != 1 then jump lobbyError
+
+  net-pid v0
+  i := playerId
+  save v0
+
+  drawWaitingScreen
+
+  # Wait for at least 1 peer (2-player) or 2 peers (3-player)
+  : loopLobbyWaiting
+    net-peers v0
+    if v0 == 0 then jump loopLobbyWaiting
+
+  return
+
+: lobbyConnectJoin
+  v0 := 255
+  delay := v0
+
+  net-join
+  if vF == 0 then jump lobbyError
+
+  net-pid v0
+  i := playerId
+  save v0
+
+  return
+
+: lobbyError
+  net-disconnect
+  clear
+  plane PLANE_PLAYER
+
+  v0 := 0xE
+  v2 := 56   v3 := 28
+  i := bighex v0
+  sprite v2 v3 10
+
+  v0 := 120
+  delay := v0
+  : loopErrorWait
+    v0 := delay
+    if v0 != 0 then jump loopErrorWait
+
+  jump lobby
+
+: drawHOST
+  v1 := 18
+  v0 := 14   i := sprH   sprite v0 v1 5
+  v0 := 20   i := sprO   sprite v0 v1 5
+  v0 := 26   i := sprS   sprite v0 v1 5
+  v0 := 32   i := sprT   sprite v0 v1 5
+  return
+
+: drawJOIN
+  v1 := 18
+  v0 := 78   i := sprJ   sprite v0 v1 5
+  v0 := 84   i := sprO   sprite v0 v1 5
+  v0 := 90   i := sprI   sprite v0 v1 5
+  v0 := 96   i := sprN   sprite v0 v1 5
+  return
+
+: drawWaitingScreen
+  clear
+  plane PLANE_PLAYER
+
+  v0 := 0
+  v2 := 60   v3 := 28
+  i := bighex v0
+  sprite v2 v3 10
+
+  return
+
+# ----------------------- GAME INIT ---------------------------
+: initGame
+  v0 := 0   v1 := 0   v2 := 0   v3 := 0
+  v4 := 0   v5 := 0   v6 := 0   v7 := 0
+  v8 := 0   v9 := 0   boardX := 0   boardY := 0
+  screenX := 0   screenY := 0   tempSave := 0
+  i := board
+  save vF   save vF   save vF   save vF
+  save vF   save vF   save vF   save vF
+  save vF   save vF   save vF   save vF
+  save v7
+
+  # Reset all game variables
+  v0 := 0
+  i := currentPieceX      save v0
+  i := currentPieceY      save v0
+  i := pieceRotation      save v0
+  i := gravityCounter     save v0
+  i := linesCount         save v0
+  i := scoreHi            save v0
+  i := scoreLo            save v0
+  i := garbageRows        save v0
+  i := garbageSource      save v0
+  i := garbageHole        save v0
+  i := gameOverFlag       save v0
+  i := keyRotPrev         save v0
+  i := keyHardDropPrev    save v0
+  i := inputRepeatCounter save v0
+  i := softDropOn         save v0
+
+  # Pick first piece
+  v0 := random 7
+  : igPickFirstPiece
+    if v0 < 7 then jump igPickFirstPieceDone
+    v0 -= 7
+    jump igPickFirstPiece
+  : igPickFirstPieceDone
+  i := pieceType   save v0
+
+  v0 := 3
+  i := currentPieceX   save v0
+  v0 := 0
+  i := currentPieceY   save v0
+
+  # Pick next piece
+  v0 := random 7
+  : igPickNextPiece
+    if v0 < 7 then jump igPickNextPieceDone
+    v0 -= 7
+    jump igPickNextPiece
+  : igPickNextPieceDone
+  i := nextPiece   save v0
+
+  return
+
+# ----------------------- GAME LOOP ---------------------------
+: gameLoop
+  handleInput
+  applyGravity
+  recvNetwork
+  drawScene
+
+  v0 := 1
+  delay := v0
+  : frameSyncLoop
+    v0 := delay
+    if v0 != 0 then jump frameSyncLoop
+
+  i := gameOverFlag   load v0
+  if v0 != 0 then jump gameOverScreen
+
+  jump gameLoop
+
+# ----------------------- INPUT ---------------------------
+: handleInput
+  handleRotation
+  handleHardDrop
+  handleSoftDrop
+  handleLateral
+  return
+
+# v8 = testingKey  v9 = prevState  v1 = currentState
+: handleRotation
+  v8 := KEY_ROTATE   v1 := 0
+  if v8 key then v1 := 1
+
+  i := keyRotPrev   load ioRegister
+  v9 := ioRegister
+  ioRegister := v1
+  i := keyRotPrev   save ioRegister
+
+  if v1 == 0 then jump hrSkip
+  if v9 != 0 then jump hrSkip
+  tryRotate
+  : hrSkip
+  return
+
+# v8 = testingKey  v9 = prevState  v1 = currentState
+: handleHardDrop
+  v8 := KEY_HARD_DROP   v1 := 0
+  if v8 key then v1 := 1
+
+  i := keyHardDropPrev   load ioRegister
+  v9 := ioRegister
+  ioRegister := v1
+  i := keyHardDropPrev   save ioRegister
+
+  if v1 == 0 then jump hhdSkip
+  if v9 != 0 then jump hhdSkip
+  doHardDrop
+  : hhdSkip
+  return
+
+# v1 = key held (0-1)
+: handleSoftDrop
+  v8 := KEY_SOFT_DROP   v1 := 0
+  if v8 key then v1 := 1
+  ioRegister := v1
+  i := softDropOn   save ioRegister
+  return
+
+# v1 = direction v2 = modulo
+: handleLateral
+  v1 := 0
+  v8 := KEY_LEFT    if v8 key then v1 := 1
+  v8 := KEY_RIGHT   if v8 key then v1 := 2
+  if v1 == 0 then jump hiRepeatReset
+
+  i := inputRepeatCounter   load ioRegister
+  v9 := ioRegister
+  v9 += 1
+  if v9 == 1 then jump hiRepeatMove
+
+  if v9 < INPUT_HOLD_DELAY then jump hiRepeatSkip
+
+  v2 := v9   v2 -= INPUT_HOLD_DELAY
+  : hiRepeatModLoop
+    if v2 < INPUT_REPEAT_RATE then jump hiRepeatModDone
+    v2 -= INPUT_REPEAT_RATE
+    jump hiRepeatModLoop
+  : hiRepeatModDone
+  if v2 != 0 then jump hiRepeatSkip
+
+  : hiRepeatMove
+  if v1 == 1 then tryMoveLeft
+  if v1 == 2 then tryMoveRight
+  ioRegister := v9
+  i := inputRepeatCounter   save ioRegister
+  return
+
+  : hiRepeatSkip
+  ioRegister := v9
+  i := inputRepeatCounter   save ioRegister
+  return
+
+  : hiRepeatReset
+  ioRegister := 0
+  i := inputRepeatCounter   save ioRegister
+  return
+
+: tryMoveLeft
+  i := currentPieceX   load v0   tempSave := v0
+  i := currentPieceY   load v0   v1 := v0
+  i := pieceRotation   load v0   v2 := v0
+  v0 := tempSave
+  v0 -= 1
+  checkCollision
+  if vF != 0 then return
+  i := currentPieceX   load v0
+  v0 -= 1
+  i := currentPieceX   save v0
+  return
+
+: tryMoveRight
+  i := currentPieceX   load v0   tempSave := v0
+  i := currentPieceY   load v0   v1 := v0
+  i := pieceRotation   load v0   v2 := v0
+  v0 := tempSave   v0 += 1
+  checkCollision
+  if vF != 0 then return
+  i := currentPieceX   load v0
+  v0 += 1
+  i := currentPieceX   save v0
+  return
+
+: tryRotate
+  i := currentPieceX   load v0   v0 := v0
+  tempSave := v0
+  i := currentPieceY   load v0   v1 := v0
+  i := pieceRotation   load v0   v2 := v0
+  v2 += 1
+  if v2 == 4 then v2 := 0
+  v0 := tempSave
+  checkCollision
+  if vF != 0 then return
+  i := pieceRotation   load v0
+  v0 += 1
+  if v0 == 4 then v0 := 0
+  i := pieceRotation   save v0
+  return
+
+: doHardDrop
+  : hdLoop
+    i := currentPieceX   load v0   tempSave := v0
+    i := currentPieceY   load v0   v1 := v0   v1 += 1
+    i := pieceRotation   load v0   v2 := v0
+    v0 := tempSave
+    checkCollision
+    if vF != 0 then jump hdLand
+    i := currentPieceY   load v0
+    v0 += 1
+    i := currentPieceY   save v0
+    jump hdLoop
+  : hdLand
+  lockPiece
+  checkLines
+  injectGarbage
+  spawnPiece
+  return
+
+: tryMoveDownOrLock
+  i := currentPieceX   load v0   tempSave := v0
+  i := currentPieceY   load v0   v1 := v0   v1 += 1
+  i := pieceRotation   load v0   v2 := v0
+  v0 := tempSave
+  checkCollision
+  if vF == 0 then jump tmdolMove
+  lockPiece
+  checkLines
+  injectGarbage
+  spawnPiece
+  return
+  : tmdolMove
+  i := currentPieceY   load v0
+  v0 += 1
+  i := currentPieceY   save v0
+  return
+
+# ----------------------- GRAVITY ---------------------------
+: applyGravity
+  i := softDropOn   load v0
+  if v0 != 0 then jump gravitySoft
+
+  i := gravityCounter   load v0
+  v0 += 1
+  if v0 < PIECE_GRAVITY then jump gravityStore
+  v0 := 0
+  tryMoveDownOrLock
+  : gravityStore
+  i := gravityCounter   save v0
+  return
+
+  : gravitySoft
+  i := gravityCounter   load v0
+  v0 += 1
+  if v0 < SOFT_RATE then jump gravitySoftStore
+  v0 := 0
+  tryMoveDownOrLock
+  : gravitySoftStore
+  i := gravityCounter   save v0
+  return
+
+# ----------------------- CHECK COLLISION ---------------------------
+: checkCollision
+  screenX := v0   screenY := v1   tempSave := v2
+
+  i := pieceType   load v0
+
+  # Piece table offset = type*16 + rot*4
+  v4 := 0   v5 := 0
+  : ccOffType
+    if v5 == v0 then jump ccOffTypeDone
+    v4 += 16   v5 += 1
+    jump ccOffType
+  : ccOffTypeDone
+  v5 := 0
+  : ccOffRot
+    if v5 == tempSave then jump ccOffRotDone
+    v4 += 4   v5 += 1
+    jump ccOffRot
+  : ccOffRotDone
+
+  i := pieces
+  i += v4
+  load v3
+
+  # piece row
+  v4 := 0
+  : ccRowLoop
+    v6 := v0
+    if v4 == 1 then v6 := v1
+    if v4 == 2 then v6 := v2
+    if v4 == 3 then v6 := v3
+
+    # piece col
+    v5 := 0
+    : ccColLoop
+      v7 := v6   v8 := 0
+      : ccShiftLoop
+        if v8 == v5 then jump ccShiftDone
+        v7 <<= v7   v8 += 1
+        jump ccShiftLoop
+      : ccShiftDone
+      v8 := v7   v8 <<= v8
+      if vF == 0 then jump ccNextCol
+
+      # Board coordinates
+      boardX := screenX
+      boardX += v5  # board col = candX + pieceCol
+      boardY := screenY
+      boardY += v4  # board row = candY + pieceRow
+
+      # Wall checks
+      if boardX > 200 then jump ccHit
+      if boardX >= BOARD_WIDTH then jump ccHit
+      if boardY >= BOARD_HEIGHT then jump ccHit
+      if boardY > 200 then jump ccNextCol   # above board top = OK
+
+      # Board occupancy: index = row*10 + col
+      v7 := 0
+      v8 := 0
+      : ccMul10
+        if v8 == boardY then jump ccMul10Done
+        v7 += 10   v8 += 1
+        jump ccMul10
+      : ccMul10Done
+      v7 += boardX
+
+      tempSave := v0
+      i := board
+      i += v7
+      load v0
+      v8 := v0
+      v0 := tempSave
+      if v8 != 0 then jump ccHit
+
+      : ccNextCol
+      v5 += 1
+      if v5 < 4 then jump ccColLoop
+
+    v4 += 1
+    if v4 < 4 then jump ccRowLoop
+
+  vF := 0
+  return
+
+  : ccHit
+  vF := 1
+  return
+
+# ----------------------- DRAW ---------------------------
+: drawScene
+  clear
+  drawBorder
+  drawBoardCells
+  drawCurrentPiece
+  drawSidebar
+  return
+
+: drawBorder
+  plane PLANE_PLAYER
+
+  v2 := BORDER_LEFT_X   v3 := BOARD_Y
+  : drawBorderLeftLoop
+    i := vLineSprite
+    sprite v2 v3 1
+    v3 += 1
+    if v3 < BORDER_BOTTOM then jump drawBorderLeftLoop
+
+  v2 := BORDER_RIGHT_X   v3 := BOARD_Y
+  : drawBorderRightLoop
+    i := vLineSprite
+    sprite v2 v3 1
+    v3 += 1
+    if v3 < BORDER_BOTTOM then jump drawBorderRightLoop
+
+  return
+
+# ── Board cells ─────────────────────────────────────────────────────
+# v5=row  v6=col  v7=board index  v8=counter  v1=cell type  screenX=sprite x  screenY=sprite y
+: drawBoardCells
+  v5 := 0
+
+  : dbcRowLoop
+    v6 := 0
+
+    : dbcColLoop
+      # Board index = row*10 + col
+      v7 := 0   v8 := 0
+      : multiplyByTenLoop
+        if v8 == v5 then jump multiplyByTenDone
+        v7 += 10   v8 += 1
+        jump multiplyByTenLoop
+      : multiplyByTenDone
+      v7 += v6
+
+      i := board   i += v7
+      load ioRegister
+      v1 := ioRegister                   # v1 = cell type
+      if v1 == 0 then jump dbcNextCol
+
+      # Screen X = BOARD_X + col * CELL_WIDTH
+      screenX := 0   v8 := 0
+      : screenXLoop
+        if v8 == v6 then jump screenXDone
+        screenX += CELL_WIDTH   v8 += 1
+        jump screenXLoop
+      : screenXDone
+      screenX += BOARD_X
+
+      # Screen Y = BOARD_Y + row * CELL_HEIGHT   (FIX: was col)
+      screenY := 0   v8 := 0
+      : screenYLoop
+        if v8 == v5 then jump screenYDone
+        screenY += CELL_HEIGHT   v8 += 1
+        jump screenYLoop     # FIX: was jump screenYDone
+      : screenYDone
+      screenY += BOARD_Y
+
+      drawCell
+
+    : dbcNextCol
+    v6 += 1
+    if v6 < BOARD_WIDTH then jump dbcColLoop
+
+  v5 += 1
+  if v5 < BOARD_HEIGHT then jump dbcRowLoop
+
+  return
+
+# v1=cellType
+: drawCell
+  if v1 == 1 then plane PLANE_PLAYER
+  if v1 == 2 then plane PLANE_ENEMY_A
+  if v1 == 3 then plane PLANE_ENEMY_B
+  i := cellSprite
+  sprite screenX screenY 3
+  return
+
+# ── Current piece ───────────────────────────────────────────────────
+# Always drawn with plane PLANE_PLAYER
+: drawCurrentPiece
+  plane PLANE_PLAYER
+
+  # Load type and rotation into screenX/screenY
+  i := pieceType   load v0   screenX := v0
+  i := pieceRotation   load v0   screenY := v0
+
+  # Piece table offset = type*16 + rot*4
+  v4 := 0   v5 := 0
+  : dcpOffType
+    if v5 == screenX then jump dcpOffTypeDone
+    v4 += 16   v5 += 1
+    jump dcpOffType
+  : dcpOffTypeDone
+  v5 := 0
+  : dcpOffRot
+    if v5 == screenY then jump dcpOffRotDone
+    v4 += 4   v5 += 1
+    jump dcpOffRot
+  : dcpOffRotDone
+
+  # Load piece position
+  i := currentPieceX   load v0   boardX := v0
+  i := currentPieceY   load v0   boardY := v0
+
+  # Load mask
+  i := pieces   i += v4
+  load v3                       # v0=row0 v1=row1 v2=row2 v3=row3
+
+  v4 := 0                       # piece row
+  : dcpRowLoop
+    v6 := v0
+    if v4 == 1 then v6 := v1
+    if v4 == 2 then v6 := v2
+    if v4 == 3 then v6 := v3
+
+    v5 := 0                     # piece col
+    : dcpColLoop
+      v7 := v6   v8 := 0
+      : dcpShiftLoop
+        if v8 == v5 then jump dcpShiftDone
+        v7 <<= v7   v8 += 1
+        jump dcpShiftLoop
+      : dcpShiftDone
+      v8 := v7   v8 <<= v8
+      if vF == 0 then jump dcpNextCol
+
+      # Screen X = BOARD_X + (pieceX + col) * CELL_WIDTH
+      screenX := boardX   screenX += v5
+      v7 := 0   v8 := 0
+      : dcpSXLoop
+        if v8 == screenX then jump dcpSXDone
+        v7 += CELL_WIDTH   v8 += 1
+        jump dcpSXLoop
+      : dcpSXDone
+      screenX := v7   screenX += BOARD_X
+
+      # Screen Y = BOARD_Y + (pieceY + row) * CELL_HEIGHT
+      screenY := boardY   screenY += v4
+      v7 := 0   v8 := 0
+      : dcpSYLoop
+        if v8 == screenY then jump dcpSYDone
+        v7 += CELL_HEIGHT   v8 += 1
+        jump dcpSYLoop
+      : dcpSYDone
+      screenY := v7   screenY += BOARD_Y
+
+      i := cellSprite
+      sprite screenX screenY 3
+
+      : dcpNextCol
+      v5 += 1
+      if v5 < 4 then jump dcpColLoop
+
+    v4 += 1
+    if v4 < 4 then jump dcpRowLoop
+
+  return
+
+: drawSidebar
+  plane PLANE_PLAYER
+
+  # Next piece label (hex "A" placeholder)
+  v0 := 0xA   v2 := 58   v3 := 2
+  i := hex v0   sprite v2 v3 5
+
+  drawNextPreview
+
+  # Score (two hex digits)
+  i := scoreHi   load v0
+  v2 := 58   v3 := 30
+  i := hex v0   sprite v2 v3 5
+
+  i := scoreLo   load v0
+  v2 := 68   v3 := 30
+  i := hex v0   sprite v2 v3 5
+
+  drawPendingBar
+
+  return
+
+: drawNextPreview
+  i := nextPiece
+  load v0
+
+  v4 := 0   v5 := 0
+  : dnpOffType
+    if v5 == v0 then jump dnpOffTypeDone
+    v4 += 16
+    v5 += 1
+    jump dnpOffType
+  : dnpOffTypeDone
+
+  i := pieces   i += v4
+  load v3
+
+  v4 := 0                             # row
+  : dnpRowLoop
+    v6 := v0
+    if v4 == 1 then v6 := v1
+    if v4 == 2 then v6 := v2
+    if v4 == 3 then v6 := v3
+
+    v5 := 0                           # col
+    : dnpColLoop
+      v7 := v6   v8 := 0
+      : dnpShift
+        if v8 == v5 then jump dnpShiftDone
+        v7 <<= v7   v8 += 1
+        jump dnpShift
+      : dnpShiftDone
+      v8 := v7   v8 <<= v8
+      if vF == 0 then jump dnpNextCol
+
+      screenX := v5   screenX += screenX   screenX += 58
+      screenY := v4   screenY += screenY   screenY += 10
+
+      i := nextCellSprite
+      sprite screenX screenY 2
+
+      : dnpNextCol
+      v5 += 1
+      if v5 < 4 then jump dnpColLoop
+
+    v4 += 1
+    if v4 < 4 then jump dnpRowLoop
+
+  return
+
+: drawPendingBar
+  plane PLANE_ENEMY_A
+
+  i := garbageRows   load v0
+  if v0 == 0 then return
+
+  screenX := 126   screenY := 61
+  : pendingBarLoop
+    i := vLineSprite
+    sprite screenX screenY 1
+    screenY -= 4
+    v0 -= 1
+    if v0 != 0 then jump pendingBarLoop
+
+  return
+
+# ----------------------- LOCK + LINE CLEAR ---------------------------
+: lockPiece
+  i := pieceType   load v0   screenX := v0
+  i := pieceRotation   load v0   screenY := v0
+
+  v4 := 0   v5 := 0
+  : lpOffType
+    if v5 == screenX then jump lpOffTypeDone
+    v4 += 16   v5 += 1
+    jump lpOffType
+  : lpOffTypeDone
+  v5 := 0
+  : lpOffRot
+    if v5 == screenY then jump lpOffRotDone
+    v4 += 4   v5 += 1
+    jump lpOffRot
+  : lpOffRotDone
+
+  i := currentPieceX   load v0   boardX := v0
+  i := currentPieceY   load v0   boardY := v0
+
+  i := pieces   i += v4
+  load v3
+
+  v4 := 0
+  : lpRowLoop
+    v6 := v0
+    if v4 == 1 then v6 := v1
+    if v4 == 2 then v6 := v2
+    if v4 == 3 then v6 := v3
+
+    v5 := 0
+    : lpColLoop
+      v7 := v6   v8 := 0
+      : lpShiftLoop
+        if v8 == v5 then jump lpShiftDone
+        v7 <<= v7   v8 += 1
+        jump lpShiftLoop
+      : lpShiftDone
+      v8 := v7   v8 <<= v8
+      if vF == 0 then jump lpNextCol
+
+      screenX := boardX   screenX += v5
+      screenY := boardY   screenY += v4
+      v7 := 0   v8 := 0
+      : lpMul10
+        if v8 == screenY then jump lpMul10Done
+        v7 += 10   v8 += 1
+        jump lpMul10
+      : lpMul10Done
+      v7 += screenX
+
+      tempSave := v0
+      v0 := CELL_PLAYER
+      i := board   i += v7
+      save v0
+      v0 := tempSave
+
+      : lpNextCol
+      v5 += 1
+      if v5 < 4 then jump lpColLoop
+
+    v4 += 1
+    if v4 < 4 then jump lpRowLoop
+
+  return
+
+# ── Check and clear lines ───────────────────────────────────────────
+: checkLines
+  v8 := 0                           # cleared count
+  v5 := 19                          # start from bottom
+
+  : clRowLoop
+    isRowFull                  # in: v5=row, out: vF
+    if vF == 0 then jump clNextRow
+    shiftDownFromRow            # removes row v5, everything above shifts down
+    v8 += 1
+    if v5 == 0 then jump clDone
+    jump clRowLoop                  # recheck same row
+
+  : clNextRow
+    if v5 == 0 then jump clDone
+    v5 -= 1
+    jump clRowLoop
+
+  : clDone
+  if v8 == 0 then return
+  sendGarbage                  # in: v8=lines cleared
+  return
+
+# Out: vF=1 if row v5 is full
+: isRowFull
+  v7 := 0   v9 := 0
+  : irfMul10
+    if v9 == v5 then jump irfMul10Done
+    v7 += 10   v9 += 1
+    jump irfMul10
+  : irfMul10Done
+
+  i := board   i += v7
+  load v9                           # loads v0-v9 (10 bytes = one row)
+
+  if v0 == 0 then jump irfNo
+  if v1 == 0 then jump irfNo
+  if v2 == 0 then jump irfNo
+  if v3 == 0 then jump irfNo
+  if v4 == 0 then jump irfNo
+  if v5 == 0 then jump irfNo
+  if v6 == 0 then jump irfNo
+  if v7 == 0 then jump irfNo
+  if v8 == 0 then jump irfNo
+  if v9 == 0 then jump irfNo
+  vF := 1   return
+  : irfNo
+  vF := 0   return
+
+# Removes row v5 by copying row[k-1] into row[k] for k from v5 downto 1, then zeros row 0
+: shiftDownFromRow
+  # v6 = dest row (counts down), v7 = source row (v6-1), v7 reused as offset
+  v6 := v5
+  : sdrLoop
+    if v6 == 0 then jump sdrZeroTop
+
+    boardY := v6   boardY -= 1     # boardY = source row index
+
+    v7 := 0   v9 := 0             # compute source offset = boardY * 10
+    : sdrSrcMul
+      if v9 == boardY then jump sdrSrcDone
+      v7 += 10   v9 += 1
+      jump sdrSrcMul
+    : sdrSrcDone
+    i := board   i += v7
+    load v9                        # 10 bytes from source row -> v0-v9
+
+    v7 := 0   v9 := 0             # compute dest offset = v6 * 10
+    : sdrDstMul
+      if v9 == v6 then jump sdrDstDone
+      v7 += 10   v9 += 1
+      jump sdrDstMul
+    : sdrDstDone
+    i := board   i += v7
+    save v9                        # write 10 bytes to dest row
+
+    v6 -= 1
+    jump sdrLoop
+
+  : sdrZeroTop
+  v0 := 0   v1 := 0   v2 := 0   v3 := 0   v4 := 0
+  v5 := 0   v6 := 0   v7 := 0   v8 := 0   v9 := 0
+  i := board
+  save v9
+  return
+
+# ----------------------- GARBAGE ---------------------------
+# In: v8 = lines cleared (1-4)
+: sendGarbage
+  if v8 == 1 then return           # 1-line = no garbage
+  v1 := v8                         # v1 = garbage row count
+  if v1 == 2 then v1 := 1
+  if v1 == 3 then v1 := 2
+  # v1==4 stays 4
+
+  : sgClamp
+    if v2 < 10 then jump sgOk
+    v2 -= 10
+    jump sgClamp
+  : sgOk
+
+  i := net-tx
+  ioRegister := MSG_GARBAGE
+  save v2                          # writes ioRegister(type), v1(rows), v2(hole)
+  net-send
+  return
+
+: injectGarbage
+  i := garbageRows   load ioRegister    # ioRegister = garbage row count
+  if ioRegister == 0 then return
+  v5 := ioRegister                      # v5 = rows to inject
+
+  i := garbageSource   load ioRegister   v1 := ioRegister
+  i := playerId        load ioRegister   v2 := ioRegister
+
+  v3 := CELL_ENEMY_A
+  if v1 > v2 then v3 := CELL_ENEMY_B
+
+  i := garbageHole   load v4       # v4 = hole column
+
+  : igShiftLoop
+    if v5 == 0 then jump igFill
+    shiftBoardUpOne
+    v5 -= 1
+    jump igShiftLoop
+
+  : igFill
+  i := garbageRows   load ioRegister    # ioRegister = original count
+  boardY := 20   boardY -= ioRegister   # boardY = first garbage row index
+
+  : igFillLoop
+    if boardY >= BOARD_HEIGHT then jump igDone
+    fillGarbageRow             # in: boardY=row, v3=cellType, v4=holeCol
+    boardY += 1
+    jump igFillLoop
+
+  : igDone
+  ioRegister := 0
+  i := garbageRows   save ioRegister
+  return
+
+# v6 = dest row counter (0→18), v7 = source row / offset accumulator
+: shiftBoardUpOne
+  v6 := 0
+  : sbupLoop
+    if v6 >= 19 then jump sbupZeroBottom
+
+    boardY := v6   boardY += 1    # boardY = source row (one below dest)
+    v7 := 0   v9 := 0
+    : sbupSrcMul
+      if v9 == boardY then jump sbupSrcDone
+      v7 += 10   v9 += 1
+      jump sbupSrcMul
+    : sbupSrcDone
+    i := board   i += v7
+    load v9
+
+    v7 := 0   v9 := 0            # dest offset = v6 * 10
+    : sbupDstMul
+      if v9 == v6 then jump sbupDstDone
+      v7 += 10   v9 += 1
+      jump sbupDstMul
+    : sbupDstDone
+    i := board   i += v7
+    save v9
+
+    v6 += 1
+    jump sbupLoop
+
+  : sbupZeroBottom
+  v0 := 0   v1 := 0   v2 := 0   v3 := 0   v4 := 0
+  v5 := 0   v6 := 0   v7 := 0   v8 := 0   v9 := 0
+  v7 := 190                         # 19 * 10
+  i := board   i += v7
+  save v9
+  return
+
+# In: boardY=row, v3=cellType, v4=holeCol
+: fillGarbageRow
+  v7 := 0   v9 := 0
+  : fgrMul10
+    if v9 == boardY then jump fgrMul10Done
+    v7 += 10   v9 += 1
+    jump fgrMul10
+  : fgrMul10Done
+
+  v5 := 0                           # col
+  : fgrColLoop
+    if v5 >= BOARD_WIDTH then return
+
+    v8 := v3
+    if v5 == v4 then v8 := 0        # hole
+
+    v9 := v7   v9 += v5
+    tempSave := v0
+    v0 := v8
+    i := board   i += v9
+    save v0
+    v0 := tempSave
+
+    v5 += 1
+    jump fgrColLoop
+
+# ----------------------- SPAWN ---------------------------
+: spawnPiece
+  # Promote next -> current
+  i := nextPiece   load v0
+  i := pieceType   save v0
+
+  # New next piece
+  v0 := random 7
+  : spClamp
+    if v0 < 7 then jump spOk
+    v0 -= 7
+    jump spClamp
+  : spOk
+  i := nextPiece   save v0
+
+  # Starting position
+  v0 := 3   i := currentPieceX   save v0
+  v0 := 0   i := currentPieceY   save v0
+  v0 := 0   i := pieceRotation   save v0
+  v0 := 0   i := gravityCounter  save v0
+
+  # Check if spawn position already blocked (top-out)
+  i := currentPieceX   load v0   tempSave := v0
+  i := currentPieceY   load v0   v1 := v0
+  i := pieceRotation   load v0   v2 := v0
+  v0 := tempSave
+  checkCollision
+  if vF == 0 then return
+
+  # Topped out
+  v0 := 1
+  i := gameOverFlag   save v0
+  return
+
+# ----------------------- NETWORK RECEIVE ---------------------------
+: recvNetwork
+  : rnLoop
+    i := net-rx
+    net-recv
+    if vF == 0 then return
+
+    # Read sender ID at net-rx[16]
+    i := net-rx
+    v8 := 16   i += v8
+    load ioRegister
+    v1 := ioRegister                        # v1 = sender playerID
+
+    if v1 == DISCONNECT_ID then jump rnDisconnect
+
+    # Read message type at net-rx[0]
+    i := net-rx   load v0
+    if v0 == MSG_GARBAGE then jump rnGarbage
+    if v0 == MSG_GAMEOVER then jump rnGameover
+    jump rnLoop
+
+  # ── Garbage packet ─────────────────────────────────────────────
+  : rnGarbage
+    i := net-rx   load v2           # v0=type v1=numRows v2=holeCol
+
+    i := garbageRows   load v3      # v3 = current pending count
+    v3 += v1
+    if v3 > 4 then v3 := 4
+    i := garbageRows   save v3
+    v0 := v2   i := garbageHole   save v0
+    v0 := boardX   i := garbageSource save v0
+
+    jump rnLoop
+
+  # ── Gameover packet ────────────────────────────────────────────
+  : rnGameover
+    i := net-rx   load v1           # v1 = loser's playerID
+
+    i := aliveMask   load v2        # v2 = alive mask
+    if v1 != 1 then jump rnGOSkipP1
+    v9 := 0xFE   v2 &= v9           # clear bit 0 (player 1 dead)
+    : rnGOSkipP1
+    if v1 != 2 then jump rnGOSkipP2
+    v9 := 0xFD   v2 &= v9           # clear bit 1 (player 2 dead)
+    : rnGOSkipP2
+    if v1 != 3 then jump rnGOSkipP3
+    v9 := 0xFB   v2 &= v9           # clear bit 2 (player 3 dead)
+    : rnGOSkipP3
+    i := aliveMask   save v2
+
+    # Count bits to check for winner
+    v3 := 0
+    v9 := 1   v4 := v2   v4 &= v9   if v4 != 0 then v3 += 1
+    v9 := 2   v4 := v2   v4 &= v9   if v4 != 0 then v3 += 1
+    v9 := 4   v4 := v2   v4 &= v9   if v4 != 0 then v3 += 1
+    if v3 == 1 then jump rnWinner
+
+    jump rnLoop
+
+  : rnWinner
+    clear   plane PLANE_PLAYER
+    v0 := 0xA   v2 := 48   v3 := 26
+    i := bighex v0   sprite v2 v3 10
+    v0 := 180   delay := v0
+    : winnerWait
+      v0 := delay
+      if v0 != 0 then jump winnerWait
+    net-disconnect
+    jump restart
+
+  # ── Disconnect notification ────────────────────────────────────
+  : rnDisconnect
+    i := net-rx   load v0           # v0 = disconnected player ID
+
+    i := aliveMask   load v2
+    if v0 != 1 then jump rnDCSkipP1
+    v9 := 0xFE   v2 &= v9
+    : rnDCSkipP1
+    if v0 != 2 then jump rnDCSkipP2
+    v9 := 0xFD   v2 &= v9
+    : rnDCSkipP2
+    if v0 != 3 then jump rnDCSkipP3
+    v9 := 0xFB   v2 &= v9
+    : rnDCSkipP3
+    i := aliveMask   save v2
+
+    drawDisconnectNotice       # v0 = disconnected ID
+
+    # Host continues; client tries to reconnect
+    i := playerId   load v1
+    if v1 == 1 then jump rnLoop
+
+    attemptReconnect
+    if vF == 1 then jump rnLoop
+    net-disconnect
+    jump restart
+
+: drawDisconnectNotice
+  plane PLANE_ENEMY_A
+  i := hex v0
+  v2 := 58   v3 := 50
+  sprite v2 v3 5
+  v1 := 60   delay := v1
+  : discWait
+    v1 := delay
+    if v1 != 0 then jump discWait
+  return
+
+: attemptReconnect
+  v9 := 3                           # max attempts
+  : arLoop
+    if v9 == 0 then jump arFail
+    v0 := 180   delay := v0
+    net-join
+    if vF == 1 then jump arOk
+    v9 -= 1
+    jump arLoop
+  : arOk
+  net-pid v0
+  i := playerId   save v0
+  vF := 1   return
+  : arFail
+  vF := 0   return
+
+# ----------------------- GAME OVER ---------------------------
+: gameOverScreen
+  # Notify others - send 3 times to survive UDP packet loss
+  i := net-tx
+  v0 := MSG_GAMEOVER
+  net-pid v1
+  save v1
+  net-send
+  net-send
+  net-send
+
+  # Fill animation
+  v5 := 19
+  : gameOverRowLoop
+    if v5 > 19 then return
+
+    v6 := 0
+    : gameOverColLoop
+      if v6 >= BOARD_WIDTH then jump gameOverNextRow
+
+      screenX := v6
+      v8 := 0   v9 := 0
+      : gameOverCalcScreenX
+        if v9 == screenX then jump gameOverCalcScreenXDone
+        v9 += CELL_WIDTH   v8 += 1
+        jump gameOverCalcScreenX
+      : gameOverCalcScreenXDone
+      screenX := v9   screenX += BOARD_X
+
+      screenY := v5
+      v8 := 0   v9 := 0
+      : gameOverCalcScreenY
+        if v8 == screenY then jump gameOverCalcScreenYDone
+        v9 += CELL_HEIGHT   v8 += 1
+        jump gameOverCalcScreenY
+      : gameOverCalcScreenYDone
+      screenY := v9   screenY += BOARD_Y
+
+      plane PLANE_ENEMY_B
+      i := cellSprite
+      sprite screenX screenY 3
+
+      v6 += 1
+      jump gameOverColLoop
+
+    : gameOverNextRow
+    v0 := 2   delay := v0
+    
+    : gameOverWait
+      v0 := delay
+      if v0 != 0 then jump gameOverWait
+
+    if v5 == 0 then jump gameOverDone
+    v5 -= 1
+    jump gameOverRowLoop
+
+  : gameOverDone
+  v0 := 180   delay := v0
+
+  : gameOverFinalWait
+    v0 := delay
+    if v0 != 0 then jump gameOverFinalWait
+
+  net-disconnect
+  jump restart

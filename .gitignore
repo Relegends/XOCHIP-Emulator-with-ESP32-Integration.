@@ -361,3 +361,40 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+PlatformIO/Chip8/roms/1-chip8-logo.ch8
+PlatformIO/Chip8/roms/2-ibm-logo.ch8
+PlatformIO/Chip8/roms/3-corax+.ch8
+PlatformIO/Chip8/roms/4-flags.ch8
+PlatformIO/Chip8/roms/5-quirks.ch8
+PlatformIO/Chip8/roms/6-keypad.ch8
+PlatformIO/Chip8/roms/7-beep.ch8
+PlatformIO/Chip8/roms/8-scrolling.ch8
+PlatformIO/Chip8/roms/15 Puzzle \[Roger Ivie].ch8
+PlatformIO/Chip8/roms/Airplane.ch8
+PlatformIO/Chip8/roms/Animal Race \[Brian Astle].ch8
+PlatformIO/Chip8/roms/binding.ch8
+PlatformIO/Chip8/roms/Blitz \[David Winter].ch8
+PlatformIO/Chip8/roms/c8_test (1).c8
+PlatformIO/Chip8/roms/c8_test.c8
+PlatformIO/Chip8/roms/caveexplorer (1).ch8
+PlatformIO/Chip8/roms/caveexplorer.8o
+PlatformIO/Chip8/roms/caveexplorer.ch8
+PlatformIO/Chip8/roms/chiptest.ch8
+PlatformIO/Chip8/roms/danm8ku.ch8
+PlatformIO/Chip8/roms/Delay Timer Test \[Matthew Mikolay, 2010].ch8
+PlatformIO/Chip8/roms/isaacTest.ch8
+PlatformIO/Chip8/roms/nyancat.ch8
+PlatformIO/Chip8/roms/octojam9title.ch8
+PlatformIO/Chip8/roms/output.ch8
+PlatformIO/Chip8/roms/Pong (1 player).ch8
+PlatformIO/Chip8/roms/Space Flight.ch8
+PlatformIO/Chip8/roms/superneatboy.ch8
+PlatformIO/Chip8/roms/test_opcode.ch8
+PlatformIO/Chip8/roms/testRom.ch8
+PlatformIO/Chip8/roms/wonkypong.ch8
+PlatformIO/Chip8/roms/xomusicplayer.ch8
+PlatformIO/Chip8/roms/xomusicplayer2.ch8
+PlatformIO/Chip8/games/Tetris88_snapshots.octo
+PlatformIO/Chip8/games/TresEnRaya_snapshots.octo
+PlatformIO/Chip8/roms/Tetris88_snapshots.ch8
+PlatformIO/Chip8/roms/TresEnRaya_snapshots.ch8
