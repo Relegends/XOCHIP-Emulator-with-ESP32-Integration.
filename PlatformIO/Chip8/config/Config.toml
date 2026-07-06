@@ -6,7 +6,7 @@ Log = 0
 [InterpreterMode]
 interpreter = 3
 
-#Quirks Values: -1 = Default by Interpreter, 0 = OFF, 1 = 0N
+#Quirks Values: -1 = Default by Interpreter, 0 = OFF, 1 = 0N 
 [Quirks]
 VFreset = -1
 Memory = -1
@@ -16,7 +16,7 @@ Shifting = -1
 Jumping = -1
 
 [IPF]
-IPF = 10000
+IPF = 100000
 
 [Display]
 windowResolution = [320, 240]
@@ -27,15 +27,16 @@ foreground2Color = 0xB6E9
 blendedColor = 0xB6E9
 
 [Panel]
-panelResolution = [240, 320]
-rotation = 1
-rgbOrder = 0
-flipY = 0
+panelResolution = [320, 240]
+rotation = 0
+rgbOrder = 1
+flipY = 1
+flipX = 1
 
 [Audio]
 frequency = 440
 sampleRate = 44100
-volume = 10
+volume = 3000
 
 [Keyboard]
 1 = ["Key_1", 0]
@@ -53,14 +54,7 @@ E = ["Key_E", 11]
 A = ["Key_A", 12]
 0 = ["Key_0", 13]
 B = ["Key_B", 14]
-F = ["Key_F", 15]
+F = ["Key_F", 15] 
 
 [UserFlags]
 userFlags = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-
-# WiFi channel 1-13; all devices must match
-[Network]
-deviceName = "CHIP8-1"
-wifiChannel = 6
-ssid = "CHIP8NET"
-password = "chip8play" # WPA2 password (min 8 chars)

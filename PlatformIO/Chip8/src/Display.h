@@ -48,6 +48,11 @@ public:
 
 	bool IsWindowClose() const;
 
+	FisicalPanel& GetPanel() { return m_panel; }
+
+private:
+	void UpdateScale();
+
 private:
 	void Render();
 	void DrawPixel(unsigned int x, unsigned int y, bool planeLSB, bool planeMSB);
@@ -69,6 +74,10 @@ private:
 	unsigned int m_displayHeight;
 
 	bool m_extendedMode;
+	bool m_isFlipY;
+
+	float m_scaleX;
+	float m_scaleY;
 
 	std::vector<bool> m_display;
 	std::vector<bool> m_secondPlane;

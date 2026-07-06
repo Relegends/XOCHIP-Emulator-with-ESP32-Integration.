@@ -28,7 +28,7 @@ bool FisicalPanel::Init(const unsigned int panelWidth, const unsigned int panelH
 	}
 
     // URJC 0
-    setRotation(1);
+    setRotation(m_panelRotation);
     setSwapBytes(true);
 
     LOG("{FisicalPanel} Initialized successfully!");

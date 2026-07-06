@@ -394,3 +394,7 @@ PlatformIO/Chip8/roms/testRom.ch8
 PlatformIO/Chip8/roms/wonkypong.ch8
 PlatformIO/Chip8/roms/xomusicplayer.ch8
 PlatformIO/Chip8/roms/xomusicplayer2.ch8
+PlatformIO/Chip8/games/Tetris88_snapshots.octo
+PlatformIO/Chip8/games/TresEnRaya_snapshots.octo
+PlatformIO/Chip8/roms/Tetris88_snapshots.ch8
+PlatformIO/Chip8/roms/TresEnRaya_snapshots.ch8

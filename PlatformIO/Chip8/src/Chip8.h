@@ -23,8 +23,10 @@ public:
 	Chip8();
 
 	bool Init(const std::string& configFilePath);
-	
+
 	bool LoadGame(const std::string& gameName);
+
+	std::string SelectRom(const std::string& romsDir);
 
 	void Simulate_Cycle();
 

@@ -17,6 +17,10 @@ Display::Display() :
 	m_closeWindow = false;
 	m_needsUpdate = false;
 	m_extendedMode = false;
+	m_isFlipY = false;
+
+	m_scaleX = 1.0f;
+	m_scaleY = 1.0f;
 
 	m_activePlane = LSB_PLANE;
 }
@@ -36,6 +40,7 @@ bool Display::Init(
 	m_windowHeight = windowHeight;
 	m_displayWidth = displayWidth;
 	m_displayHeight = displayHeight;
+	m_isFlipY = isFlipY;
 
     m_backgroundColor = backgroundColor;
     m_foreground_1Color = foreground1Color;
@@ -44,6 +49,8 @@ bool Display::Init(
 
 	m_display.resize(displayHeight * displayWidth);
 	m_secondPlane.resize(displayHeight * displayWidth);
+
+	UpdateScale();
 
 	if (!m_panel.Init(panelWidth, panelHeight, panelRotation, rgbOrder, isFlipY))
 	{
@@ -402,18 +409,25 @@ void Display::UpdateTexture()
 }
 */
 
+void Display::UpdateScale()
+{
+	const float scale = std::min(
+		(float)m_windowWidth  / m_displayWidth,
+		(float)m_windowHeight / m_displayHeight
+	);
+	m_scaleX = scale;
+	m_scaleY = m_isFlipY ? -scale : scale;
+}
+
 void Display::UpdateTexture()
 {
-	const float scale = std::min((float)m_windowWidth / m_displayWidth,
-	                             (float)m_windowHeight / m_displayHeight);
-
 	m_panel.pushImageRotateZoom(
 		m_windowWidth  / 2.0f,
 		m_windowHeight / 2.0f,
 		m_displayWidth  / 2.0f,
 		m_displayHeight / 2.0f,
 		0.0f,
-		scale, scale,
+		m_scaleX, m_scaleY,
 		m_displayWidth, m_displayHeight,
 		(uint16_t*)m_sprite.getBuffer()
 	);
@@ -449,6 +463,8 @@ void Display::SetExtendedMode(const bool enable)
 
 	m_display.resize(m_displayWidth * m_displayHeight, 0);
 	m_secondPlane.resize(m_displayWidth * m_displayHeight, 0);
+
+	UpdateScale();
 
 	m_sprite.deleteSprite();
 	m_sprite.createSprite(m_displayWidth, m_displayHeight);

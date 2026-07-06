@@ -186,6 +186,11 @@ bool Configuration::GetIsFlipY() const
     return m_config["Panel"]["flipY"].value_or(0);
 }
 
+bool Configuration::GetIsFlipX() const
+{
+    return m_config["Panel"]["flipX"].value_or(0);
+}
+
 std::string Configuration::GetNetworkDeviceName() const
 {
 	auto val = m_config["Network"]["deviceName"].value_or("CHIP8-1");

@@ -88,10 +88,10 @@ extern "C" void app_main()
 
 	bool emulatorInit = emulator->Init("/sdcard/config/Config.toml");
 
-	std::string romFile = "/sdcard/roms/xomusicplayer.ch8";
+	std::string romFile = emulatorInit ? emulator->SelectRom("/sdcard/roms") : "";
 	LOG("{Main} Loading ROM: %s", romFile.c_str());
 
-	bool gameLoaded = emulator->LoadGame(romFile);
+	bool gameLoaded = !romFile.empty() && emulator->LoadGame(romFile);
 
 	if (emulatorInit && gameLoaded)
 		emulator->Run();

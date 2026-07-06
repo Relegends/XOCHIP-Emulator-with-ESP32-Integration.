@@ -1,4 +1,5 @@
 #include "Chip8.h"
+#include "RomSelector.h"
 
 Chip8::Chip8() :
 	m_V({ 0 }),
@@ -33,7 +34,7 @@ bool Chip8::Init(const std::string& configFilePath)
 		m_config.GetRotation(), m_config.GetRGBOrder(), m_config.GetIsFlipY())) return false;
 	if(!m_audio.Init(m_config.GetAudioFrequency(), m_config.GetAudioSampleRate(), m_config.GetAudioVolume())) return false;
 	if(!m_network.Init(m_config.GetNetworkDeviceName(), m_config.GetNetworkWifiChannel())) return false;
-	//if(!m_keyboard.Init(m_config.GetInputMap())) return false;
+	if(!m_keyboard.Init(m_config.GetInputMap())) return false;
 
 	m_V = { 0 };
 	m_memory = { 0 };
@@ -419,6 +420,12 @@ bool Chip8::LoadGame(const std::string& gameName)
 	return true;
 }
 
+std::string Chip8::SelectRom(const std::string& romsDir)
+{
+	RomSelector selector;
+	return selector.Select(romsDir, m_display.GetPanel(), &m_keyboard, m_config.GetIsFlipY(), m_config.GetIsFlipX());
+}
+
 void Chip8::Simulate_Cycle()
 {
 	Chip8::Decode(Chip8::Fetch());
@@ -436,7 +443,7 @@ void Chip8::Run()
 
 	while (!m_display.IsWindowClose())
 	{
-		//m_keyboard.ProcessInput();
+		m_keyboard.ProcessInput();
 		int64_t frameStart   = esp_timer_get_time();
 		int64_t frameDeadline = frameStart + frameBudgetUs;
 
@@ -456,10 +463,9 @@ void Chip8::Run()
 			m_instructionCount++;
 		}
 
-		//m_keyboard.SavePreviousInputs();
+		m_keyboard.SavePreviousInputs();
 
-		LOG("{Chip8} INS: %d  DISP: %lldus  FRAME: %lldus",
-		    m_instructionCount, displayUs, esp_timer_get_time() - frameStart);
+		//LOG("{Chip8} INS: %d  DISP: %lldus  FRAME: %lldus", m_instructionCount, displayUs, esp_timer_get_time() - frameStart);
 		UpdateTimers();
 		vTaskDelayUntil(&lastFrameTick, framePeriod);
 	}

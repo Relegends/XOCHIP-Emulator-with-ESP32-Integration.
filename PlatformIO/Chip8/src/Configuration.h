@@ -36,6 +36,7 @@ public:
 	unsigned int GetRotation() const;
 	bool GetRGBOrder() const;
 	bool GetIsFlipY() const;
+	bool GetIsFlipX() const;
 
 
 
