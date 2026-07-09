@@ -30,7 +30,9 @@ public:
 
 	void Simulate_Cycle();
 
-	void Run();
+	void Reset();
+
+	bool Run();
 
 private:
 
@@ -105,10 +107,11 @@ private:
 	void Fun_FxA6(); // NET PEERS (Vx = destination)
 	void Fun_FxA7(); // NET PID   (Vx = destination)
 	void Fun_FxA8(); // NET WAIT
+	void Fun_FxAF(); // DEBUG LOG
 
 private:
 	std::array<uint8_t, 16> m_V;
-	std::array<uint8_t, 0x10000> m_memory;
+	std::array<uint8_t, 0x4000> m_memory;
 
 
 	uint16_t m_indexRegister; // Only the lowest 12 bits are used. Points to locations in the memory (0x000 - 0xFFF)

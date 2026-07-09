@@ -13,5 +13,6 @@ private:
     std::vector<std::string> ListRoms(const std::string& romsDir);
     void Render(lgfx::LGFXBase& canvas, const std::vector<std::string>& roms,
                 int selected, int scrollOffset, int maxVisible);
-    void PushToPanel(lgfx::LGFX_Sprite& sprite, FisicalPanel& panel, bool isFlipY, bool isFlipX);
+    void PushToPanel(lgfx::LGFX_Sprite& sprite, FisicalPanel& panel, bool isFlipY, bool isFlipX,
+                     float pW = 320.0f, float pH = 240.0f);
 };

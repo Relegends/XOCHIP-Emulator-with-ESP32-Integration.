@@ -1,5 +1,6 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <esp_system.h>
 #include <Log.h>
 #include "Chip8.h"
 #include "Storage.h"
@@ -94,13 +95,16 @@ extern "C" void app_main()
 	bool gameLoaded = !romFile.empty() && emulator->LoadGame(romFile);
 
 	if (emulatorInit && gameLoaded)
-		emulator->Run();
+	{
+		while (emulator->Run())
+		{
+			emulator->Reset();
+			emulator->LoadGame(romFile);
+		}
+	}
 	else
 		LOGE("{Main} Failed to run emulator. Exiting...");
-	
-	LOG("{Main} Bye Bye!");
 
-	while (true) {
-		vTaskDelay(pdMS_TO_TICKS(1000));
-	}
+	LOG("{Main} Restarting...");
+	esp_restart();
 }

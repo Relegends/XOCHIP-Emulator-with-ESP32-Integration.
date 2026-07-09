@@ -22,7 +22,7 @@ static constexpr size_t   NET_PAYLOAD_SIZE    = 16;
 static constexpr uint16_t NET_PORT            = 7777;
 static constexpr uint8_t  NET_MAX_PEERS       = 2;
 static constexpr uint8_t  NET_DISCONNECT_ID   = 0xFF; // synthetic playerID for peer-lost notifications
-static constexpr uint32_t NET_PEER_TIMEOUT_MS = 3000; // ms of silence before a peer is considered gone
+static constexpr uint32_t NET_PEER_TIMEOUT_MS = 10000; // ms of silence before a peer is considered gone
 
 struct NetworkPacket
 {
@@ -92,5 +92,8 @@ private:
     EventGroupHandle_t m_wifiEventGroup;
     mutable std::mutex m_mutex;
     bool m_isWifiDriverInit;
+
+    esp_netif_t* m_apNetif;
+    esp_netif_t* m_staNetif;
 
 };

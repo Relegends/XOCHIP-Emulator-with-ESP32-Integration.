@@ -1,6 +1,5 @@
 #include "RomSelector.h"
 #include <dirent.h>
-#include <esp_heap_caps.h>
 #include <algorithm>
 #include <cctype>
 #include <cstring>
@@ -9,12 +8,9 @@
 #include <freertos/task.h>
 #include "Log.h"
 
-// Sprite rendered at this size, then scaled up x2 to fill 320x240.
-// Same approach as Display::UpdateTexture: small sprite + scale > 1.
-// Dimensions chosen so scale = min(320/160, 240/116) = 2.0 (width-limited),
-// ensuring source y=0 maps to dest y = 120 + 116 = 236 < 240 (no clipping).
-static constexpr int SELECTOR_W = 160;
-static constexpr int SELECTOR_H = 116;
+// 96x72 * 2 = 13824 bytes. Scale factor: 320/96 = 240/72 = 3.333 (4:3, no letterboxing).
+static constexpr int SELECTOR_W = 96;
+static constexpr int SELECTOR_H = 72;
 
 // RGB565 palette
 static constexpr uint16_t C_BG      = 0x0000;
@@ -29,16 +25,16 @@ static constexpr uint16_t C_SCROLL  = 0x4208;
 
 // ReadKeyboard() is indexed by the key's real hex value (e.g. '2' -> 0x2), not by its
 // physical wiring position, so these match the hex digit of the chosen keys directly.
-static constexpr int KEY_UP     = 0x2;
+static constexpr int KEY_UP     = 0x5;
 static constexpr int KEY_DOWN   = 0x8;
-static constexpr int KEY_SELECT = 0x5;
+static constexpr int KEY_SELECT = 0xE;
 
-// Layout at SELECTOR_W x SELECTOR_H using textSize(1) — Font0 6x8.
-// After x2 scale, chars appear as 12x16 on screen.
-static constexpr int TITLE_H = 12;
-static constexpr int ITEM_H  = 10;
-static constexpr int HINT_H  = 10;
-static constexpr int MARGIN  = 3;
+// Layout at SELECTOR_W x SELECTOR_H using textSize(1) -- Font0 6x8.
+// After 3.33x scale, chars appear as ~20x27 on screen (readable).
+static constexpr int TITLE_H = 10;
+static constexpr int ITEM_H  = 9;
+static constexpr int HINT_H  = 9;
+static constexpr int MARGIN  = 2;
 static constexpr int CHAR_W  = 6;
 static constexpr int CHAR_H  = 8;
 
@@ -75,31 +71,19 @@ std::vector<std::string> RomSelector::ListRoms(const std::string& romsDir)
     return roms;
 }
 
-// Mirrors Display::UpdateTexture exactly:
-//   scale = min(panelW / spriteW, panelH / spriteH)
-//   scaleY = isFlipY ? -scale : scale
-//   pushImageRotateZoom(panelW/2, panelH/2, spriteW/2, spriteH/2, 0, scaleX, scaleY, spriteW, spriteH, buf)
-void RomSelector::PushToPanel(lgfx::LGFX_Sprite& sprite, FisicalPanel& panel, bool isFlipY, bool isFlipX)
+// Mirrors Display::UpdateTexture: negative scaleY when isFlipY, negative scaleX when isFlipX.
+// pW/pH must be the physical panel size (320x240) — never panel.width()/height(), which
+// may return swapped values depending on the current rotation setting.
+void RomSelector::PushToPanel(lgfx::LGFX_Sprite& sprite, FisicalPanel& panel, bool isFlipY, bool isFlipX,
+                               float pW, float pH)
 {
-    const float W  = static_cast<float>(sprite.width());
-    const float H  = static_cast<float>(sprite.height());
-    const float pW = static_cast<float>(panel.width());
-    const float pH = static_cast<float>(panel.height());
+    const float sW     = static_cast<float>(sprite.width());
+    const float sH     = static_cast<float>(sprite.height());
+    const float scaleX = (isFlipX ? -1.0f : 1.0f) * (pW / sW);
+    const float scaleY = (isFlipY ? -1.0f : 1.0f) * (pH / sH);
 
-    isFlipX = 1;
-    isFlipY = 0;
-
-    const float scaleX = isFlipX ? -(pW / W) : (pW / W);
-    const float scaleY = isFlipY ? -(pH / H) : (pH / H);
-
-    panel.pushImageRotateZoom(
-        pW / 2.0f, pH / 2.0f,
-        W  / 2.0f, H  / 2.0f,
-        0.0f,
-        scaleX, scaleY,
-        static_cast<int>(W), static_cast<int>(H),
-        static_cast<uint16_t*>(sprite.getBuffer())
-    );
+    sprite.setPivot(sW / 2.0f, sH / 2.0f);
+    sprite.pushRotateZoom(&panel, pW / 2.0f, pH / 2.0f, 0.0f, scaleX, scaleY);
 }
 
 void RomSelector::Render(lgfx::LGFXBase& cv, const std::vector<std::string>& roms,
@@ -115,9 +99,9 @@ void RomSelector::Render(lgfx::LGFXBase& cv, const std::vector<std::string>& rom
     cv.fillRect(0, 0, W, TITLE_H, C_TITLEBG);
     cv.setTextSize(1);
     cv.setTextColor(C_TITLE, C_TITLEBG);
-    cv.drawString("CHIP-8 ROM SELECTOR", MARGIN, (TITLE_H - CHAR_H) / 2);
+    cv.drawString("CHIP-8", MARGIN, (TITLE_H - CHAR_H) / 2);
 
-    char countBuf[32];
+    char countBuf[24];
     snprintf(countBuf, sizeof(countBuf), "%d/%d", selected + 1, total);
     int countX = W - static_cast<int>(strlen(countBuf)) * CHAR_W - MARGIN;
     cv.drawString(countBuf, countX, (TITLE_H - CHAR_H) / 2);
@@ -126,7 +110,7 @@ void RomSelector::Render(lgfx::LGFXBase& cv, const std::vector<std::string>& rom
 
     // ROM list
     const int listY   = TITLE_H + 1;
-    const int listW   = W - 8;
+    const int listW   = W - 6;
     const int maxChar = (listW - MARGIN) / CHAR_W;
 
     cv.setTextSize(1);
@@ -151,12 +135,12 @@ void RomSelector::Render(lgfx::LGFXBase& cv, const std::vector<std::string>& rom
 
     // Scrollbar
     if (total > maxVisible) {
-        const int sbX   = W - 6;
+        const int sbX   = W - 4;
         const int listH = maxVisible * ITEM_H;
-        cv.fillRect(sbX, listY, 4, listH, C_SCROLL);
-        int thumbH = std::max(4, listH * maxVisible / total);
+        cv.fillRect(sbX, listY, 3, listH, C_SCROLL);
+        int thumbH = std::max(3, listH * maxVisible / total);
         int thumbY = listY + (listH - thumbH) * scrollOffset / (total - maxVisible);
-        cv.fillRect(sbX, thumbY, 4, thumbH, C_HINT);
+        cv.fillRect(sbX, thumbY, 3, thumbH, C_HINT);
     }
 
     // Hint bar
@@ -164,32 +148,27 @@ void RomSelector::Render(lgfx::LGFXBase& cv, const std::vector<std::string>& rom
     cv.drawFastHLine(0, hintY - 1, W, C_LINE);
     cv.setTextSize(1);
     cv.setTextColor(C_HINT, C_BG);
-    cv.drawString("2=UP  8=DOWN  5=SELECT", MARGIN, hintY + (HINT_H - CHAR_H) / 2);
+    cv.drawString("2=UP 8=DN 5=OK", MARGIN, hintY + (HINT_H - CHAR_H) / 2);
 }
 
 std::string RomSelector::Select(const std::string& romsDir, FisicalPanel& panel,
                                 Keyboard* keyboard, bool isFlipY, bool isFlipX)
 {
-    const int maxVisible = (SELECTOR_H - TITLE_H - HINT_H - 3) / ITEM_H;
-
-    LOG("{RomSelector} Free heap: %lu bytes, largest block: %lu bytes",
-        (unsigned long)heap_caps_get_free_size(MALLOC_CAP_8BIT),
-        (unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+    const int maxVisible = (SELECTOR_H - TITLE_H - HINT_H - 2) / ITEM_H;
 
     lgfx::LGFX_Sprite sprite(&panel);
     sprite.setColorDepth(16);
     sprite.createSprite(SELECTOR_W, SELECTOR_H);
     const bool useSprite = (sprite.getBuffer() != nullptr);
 
-    LOG("{RomSelector} Sprite %s (%dx%d, needs %d bytes)",
-        useSprite ? "OK" : "FAILED",
-        SELECTOR_W, SELECTOR_H,
-        SELECTOR_W * SELECTOR_H * 2);
-
     lgfx::LGFXBase& cv = useSprite ? static_cast<lgfx::LGFXBase&>(sprite)
                                    : static_cast<lgfx::LGFXBase&>(panel);
 
-    auto flush = [&]() { if (useSprite) PushToPanel(sprite, panel, isFlipY, isFlipX); };
+    // flush pushes the sprite to the panel using the same transform as the game:
+    // positive scaleX, negative scaleY when isFlipY=true (config flipY=1).
+    auto flush = [&]() {
+        if (useSprite) PushToPanel(sprite, panel, isFlipY, isFlipX);
+    };
 
     auto roms = ListRoms(romsDir);
 
@@ -215,7 +194,7 @@ std::string RomSelector::Select(const std::string& romsDir, FisicalPanel& panel,
         cv.setTextSize(1);
         for (int secs = 5; secs > 0; secs--) {
             char buf[32];
-            snprintf(buf, sizeof(buf), "Auto-loading in %d...  ", secs);
+            snprintf(buf, sizeof(buf), "Auto: %d...  ", secs);
             cv.fillRect(0, cv.height() - HINT_H, cv.width(), HINT_H, C_BG);
             cv.setTextColor(C_TITLE, C_BG);
             cv.drawString(buf, MARGIN, cv.height() - HINT_H + (HINT_H - CHAR_H) / 2);

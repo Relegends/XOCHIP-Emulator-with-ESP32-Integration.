@@ -369,6 +369,7 @@ void Chip8::Decode(uint16_t opcode)
 		case 0xA6: return Fun_FxA6();
 		case 0xA7: return Fun_FxA7();
 		case 0xA8: return Fun_FxA8();
+		case 0xAF: return Fun_FxAF();
 		}
 		break;
 	}
@@ -422,8 +423,13 @@ bool Chip8::LoadGame(const std::string& gameName)
 
 std::string Chip8::SelectRom(const std::string& romsDir)
 {
+	// Free the 64×32 game sprite (4096 bytes) so the ROM selector can allocate its
+	// 96×72 sprite (13824 bytes). AllocSprite is called from Run() after the ROM
+	// file buffer is freed — creating 128×64 here would exhaust heap before LoadGame.
+	m_display.FreeSprite();
 	RomSelector selector;
-	return selector.Select(romsDir, m_display.GetPanel(), &m_keyboard, m_config.GetIsFlipY(), m_config.GetIsFlipX());
+	return selector.Select(romsDir, m_display.GetPanel(), &m_keyboard,
+	                       m_config.GetIsFlipY(), m_config.GetIsFlipX());
 }
 
 void Chip8::Simulate_Cycle()
@@ -431,8 +437,26 @@ void Chip8::Simulate_Cycle()
 	Chip8::Decode(Chip8::Fetch());
 }
 
-void Chip8::Run()
+void Chip8::Reset()
 {
+	m_V = { 0 };
+	m_memory = { 0 };
+	m_pc = 0x200;
+	m_stack = { 0 };
+	m_sp = m_stack.begin();
+	m_decoder = { 0 };
+	m_instructionCount = 0;
+	m_delayTimer = 0;
+	m_soundTimer = 0;
+	LoadFontSet();
+}
+
+bool Chip8::Run()
+{
+	// FreeSprite first so Run() can be called multiple times safely (game reset).
+	m_display.FreeSprite();
+	m_display.AllocSprite();
+
 	LOG("{Chip8} Starting Run loop...");
 	const float targetFPS = 60.0f;
 	const float targetTimeBtwFrames = 1000.0f / targetFPS;
@@ -440,10 +464,26 @@ void Chip8::Run()
 	TickType_t lastFrameTick = xTaskGetTickCount();
 	const int64_t frameBudgetUs = 1000000LL / 60; // 16 667 µs
 	unsigned int displayFrame = 0;
+	int dHeldFrames = 0;
+	int fHeldFrames = 0;
+	bool resetGame = false;
 
 	while (!m_display.IsWindowClose())
 	{
 		m_keyboard.ProcessInput();
+
+		if (m_keyboard.ReadKeyboard(0xD))
+		{
+			if (++dHeldFrames >= 120) { resetGame = true; break; }
+		}
+		else { dHeldFrames = 0; }
+
+		if (m_keyboard.ReadKeyboard(0xF))
+		{
+			if (++fHeldFrames >= 120) { m_network.Disconnect(); break; }
+		}
+		else { fHeldFrames = 0; }
+
 		int64_t frameStart   = esp_timer_get_time();
 		int64_t frameDeadline = frameStart + frameBudgetUs;
 
@@ -469,7 +509,9 @@ void Chip8::Run()
 		UpdateTimers();
 		vTaskDelayUntil(&lastFrameTick, framePeriod);
 	}
-	m_audio.Close();
+	if (!resetGame)
+		m_audio.Close();
+	return resetGame;
 }
 
 void Chip8::UpdateTimers()
@@ -1146,6 +1188,7 @@ void Chip8::Fun_Dxyn()
 		}
 		else
 		{
+			// XO-CHIP plane 3 (both planes): first n bytes → plane 1, next n bytes → plane 2.
 			for (int row = 0; row < m_decoder.n; row++)
 			{
 				uint8_t spriteRowLSB = m_memory[m_indexRegister + row];
@@ -1610,6 +1653,7 @@ void Chip8::Fun_FxA0()
 	case Chip8::LOGGINGMODE::OCTO_LOG:  LOG("net-host\n"); break;
 	}
 
+	m_display.Update(); // flush "CONNECTING..." sprites before blocking
 	bool ok = m_network.Host(m_config.GetNetworkSSID(), m_config.GetNetworkPassword());
 	m_V[0xF] = ok ? 1 : 0;
 }
@@ -1632,6 +1676,7 @@ void Chip8::Fun_FxA1()
 	case Chip8::LOGGINGMODE::OCTO_LOG:  LOG("net-join\n"); break;
 	}
 
+	m_display.Update(); // flush "HOSTING..." sprites before blocking
 	bool ok = m_network.Join(m_config.GetNetworkSSID(), m_config.GetNetworkPassword());
 	m_V[0xF] = ok ? 1 : 0;
 }
@@ -1676,6 +1721,7 @@ void Chip8::Fun_FxA3()
 
 	bool ok = m_network.Send(&m_memory[m_indexRegister], NET_PAYLOAD_SIZE);
 	m_V[0xF] = ok ? 1 : 0;
+	LOG("{net-send} type=%d ok=%d", m_memory[m_indexRegister], ok);
 }
 
 /*
@@ -1702,8 +1748,10 @@ void Chip8::Fun_FxA4()
 			m_memory[m_indexRegister + i] = pkt.payload[i];
 		m_memory[m_indexRegister + NET_PAYLOAD_SIZE] = pkt.playerID;
 		m_V[0xF] = 1;
+		LOG("{net-recv} pid=%d type=%d", pkt.playerID, pkt.payload[0]);
 	} else {
 		m_V[0xF] = 0;
+		LOG("{net-recv} queue empty");
 	}
 }
 
@@ -1736,6 +1784,12 @@ void Chip8::Fun_FxA5()
 		status |= (pid - 1) & 0x03;
 
 	m_V[m_decoder.x] = status;
+	LOG("{net-stat} 0x%02X (conn=%d role=%s peers=%d pid=%d)",
+		status,
+		(status >> 7) & 1,
+		(status >> 6) & 1 ? "HOST" : "CLI",
+		(status >> 2) & 3,
+		(status & 3) + 1);
 }
 
 /*
@@ -1779,6 +1833,16 @@ void Chip8::Fun_FxA7()
 }
 
 /*
+F0AF - DEBUG LOG
+Print v0..v5 and I to serial for in-game tracing.
+*/
+void Chip8::Fun_FxAF()
+{
+	LOG("{DBG} v0=%02X v1=%02X v2=%02X v3=%02X v4=%02X v5=%02X I=%04X",
+		m_V[0], m_V[1], m_V[2], m_V[3], m_V[4], m_V[5], m_indexRegister);
+}
+
+/*
 F0A8 - NET WAIT
 Stall execution (like Fx0A) until a packet arrives in the receive queue
 or the delay timer reaches 0.
@@ -1795,11 +1859,7 @@ void Chip8::Fun_FxA8()
 	bool timedOut = (m_delayTimer == 0);
 
 	if (hasData || timedOut) {
-		switch (m_logggingMode)
-		{
-		case Chip8::LOGGINGMODE::CHIP8_LOG: LOG("NET WAIT (done)\n"); break;
-		case Chip8::LOGGINGMODE::OCTO_LOG:  LOG("net-wait (done)\n"); break;
-		}
+		LOG("{net-wait} done: %s", hasData ? "PACKET" : "TIMEOUT");
 		m_V[0xF] = hasData ? 1 : 0;
 	} else {
 		m_pc -= 2; // Retry next cycle, exactly like Fx0A

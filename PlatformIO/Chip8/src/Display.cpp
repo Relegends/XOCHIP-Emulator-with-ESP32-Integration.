@@ -47,8 +47,10 @@ bool Display::Init(
     m_foreground_2Color = foreground2Color;
     m_blendedColor = blendedColor;
 
-	m_display.resize(displayHeight * displayWidth);
-	m_secondPlane.resize(displayHeight * displayWidth);
+	// Pre-allocate at SCHIP max so SetExtendedMode doesn't resize and fragment the heap
+	// before the 16384-byte sprite reallocation (resize × 2 would eat the 16384 free block).
+	m_display.resize(128 * 64, false);
+	m_secondPlane.resize(128 * 64, false);
 
 	UpdateScale();
 
@@ -363,8 +365,9 @@ void Display::DrawPixelToCombineBuffer(unsigned int x, unsigned int y, bool plan
 		break;
 	}
 
-	unsigned int offset = m_displayWidth * y + x;
+	if (m_sprite.getBuffer() == nullptr) return;
 
+	unsigned int offset = m_displayWidth * y + x;
 	((uint16_t*)m_sprite.getBuffer())[offset] = selectedColor;
 }
 
@@ -411,12 +414,9 @@ void Display::UpdateTexture()
 
 void Display::UpdateScale()
 {
-	const float scale = std::min(
-		(float)m_windowWidth  / m_displayWidth,
-		(float)m_windowHeight / m_displayHeight
-	);
-	m_scaleX = scale;
-	m_scaleY = m_isFlipY ? -scale : scale;
+	m_scaleX = (float)m_windowWidth  / m_displayWidth;
+	float sy  = (float)m_windowHeight / m_displayHeight;
+	m_scaleY  = m_isFlipY ? -sy : sy;
 }
 
 void Display::UpdateTexture()
@@ -461,15 +461,26 @@ void Display::SetExtendedMode(const bool enable)
 		m_displayHeight = 32;
 	}
 
-	m_display.resize(m_displayWidth * m_displayHeight, 0);
-	m_secondPlane.resize(m_displayWidth * m_displayHeight, 0);
-
+	// Sprite is pre-allocated at 128×64 by AllocSprite() — no reallocation needed.
+	// Vectors are pre-allocated at 128×64 in Init() — no resize needed.
 	UpdateScale();
-
-	m_sprite.deleteSprite();
-	m_sprite.createSprite(m_displayWidth, m_displayHeight);
-
 	m_panel.fillScreen(m_backgroundColor);
+	CLS();
+}
+
+void Display::FreeSprite()
+{
+	m_sprite.deleteSprite();
+}
+
+void Display::AllocSprite()
+{
+	m_sprite.setColorDepth(16);
+	if (!m_sprite.createSprite(128, 64))
+	{
+		LOGE("{Display} FATAL: AllocSprite failed (128x64, 16384 bytes)!");
+		return;
+	}
 	CLS();
 }
 

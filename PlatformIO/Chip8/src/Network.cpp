@@ -19,7 +19,9 @@ Network::Network() :
     m_networkTaskHandle(nullptr),
     m_wifiEventGroup(nullptr),
     m_wifiChannel(0),
-    m_isWifiDriverInit(false)
+    m_isWifiDriverInit(false),
+    m_apNetif(nullptr),
+    m_staNetif(nullptr)
 {
 }
 
@@ -113,7 +115,8 @@ bool Network::Host(const std::string& ssid, const std::string& password)
     Disconnect();
     LOG("{Network} Starting AP: %s", ssid.c_str());
 
-    esp_netif_create_default_wifi_ap();
+    if (!m_apNetif)
+        m_apNetif = esp_netif_create_default_wifi_ap();
 
     wifi_config_t wifi_config = {};
     strncpy((char*)wifi_config.ap.ssid, ssid.c_str(), sizeof(wifi_config.ap.ssid) - 1);
@@ -178,7 +181,8 @@ bool Network::Join(const std::string& ssid, const std::string& password)
 
     xEventGroupClearBits(m_wifiEventGroup, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
 
-    esp_netif_create_default_wifi_sta();
+    if (!m_staNetif)
+        m_staNetif = esp_netif_create_default_wifi_sta();
 
     wifi_config_t wifi_config = {};
     strncpy((char*)wifi_config.sta.ssid,     ssid.c_str(),     sizeof(wifi_config.sta.ssid) - 1);
@@ -196,34 +200,60 @@ bool Network::Join(const std::string& ssid, const std::string& password)
         LOGE("{Network} Join: wifi start failed");
         return false;
     }
-    if (esp_wifi_connect() != ESP_OK) {
-        LOGE("{Network} Join: connect failed");
-        esp_wifi_stop();
-        return false;
-    }
-
-    // Wait up to 10 seconds for an IP address
-    EventBits_t bits = xEventGroupWaitBits
-    (
-        m_wifiEventGroup,
-        WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-        pdFALSE, pdFALSE,
-        pdMS_TO_TICKS(10000)
-    );
-
-    if (!(bits & WIFI_CONNECTED_BIT)) 
+    // Retry connecting until the AP appears or 30 s elapses.
+    // Each attempt waits up to 3 s; WIFI_FAIL_BIT fires immediately when
+    // the AP is not found, so short per-attempt windows keep retry cadence tight.
+    const int64_t deadline = esp_timer_get_time() + 30000000LL; // 30 s
+    EventBits_t bits = 0;
+    while (true)
     {
-        LOGE("{Network} Join: WiFi connect timeout or failure");
-        esp_wifi_stop();
-        return false;
+        xEventGroupClearBits(m_wifiEventGroup, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
+        if (esp_wifi_connect() != ESP_OK) {
+            LOGE("{Network} Join: connect call failed");
+            esp_wifi_stop();
+            return false;
+        }
+        bits = xEventGroupWaitBits(
+            m_wifiEventGroup,
+            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+            pdFALSE, pdFALSE,
+            pdMS_TO_TICKS(3000)
+        );
+        if (bits & WIFI_CONNECTED_BIT) break;
+        if (esp_timer_get_time() >= deadline)
+        {
+            LOGE("{Network} Join: timeout waiting for AP");
+            esp_wifi_stop();
+            return false;
+        }
+        LOG("{Network} Join: AP not found, retrying...");
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 
     m_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (m_socket < 0) 
+    if (m_socket < 0)
     {
         LOGE("{Network} Join: socket create failed");
         esp_wifi_stop();
         return false;
+    }
+
+    // Bind to NET_PORT so HOST can address subsequent packets to CLIENT_IP:NET_PORT.
+    // Without this, the OS assigns a random ephemeral port; HOST always sends to
+    // CLIENT_IP:NET_PORT, so those packets would be silently dropped.
+    {
+        struct sockaddr_in local_addr = {};
+        local_addr.sin_family = AF_INET;
+        local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        local_addr.sin_port = htons(NET_PORT);
+        if (bind(m_socket, (struct sockaddr*)&local_addr, sizeof(local_addr)) < 0)
+        {
+            LOGE("{Network} Join: bind failed");
+            close(m_socket);
+            m_socket = -1;
+            esp_wifi_stop();
+            return false;
+        }
     }
 
     // Host is always the SoftAP gateway: 192.168.4.1
@@ -283,15 +313,19 @@ void Network::Disconnect()
 
     m_connected = false;
 
-    if (m_networkTaskHandle) {
-        vTaskDelete(m_networkTaskHandle);
-        m_networkTaskHandle = nullptr;
-    }
-
+    // Close the socket first — this unblocks any pending recvfrom in NetworkTask,
+    // which will then see m_connected=false, break its loop, and self-delete via
+    // vTaskDelete(nullptr). We never call vTaskDelete here to avoid double-free
+    // when NetworkTask already self-deleted (e.g. because CheckPeerTimeouts fired).
     if (m_socket >= 0) {
         close(m_socket);
         m_socket = -1;
+        // Give NetworkTask time to notice the closed socket and self-delete
+        // before Host()/Join() spawn a new one.
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
+
+    m_networkTaskHandle = nullptr;
 
     esp_wifi_stop();
 
@@ -391,7 +425,9 @@ uint32_t Network::GetPeerIP(uint8_t peerSlot) const
 
 void Network::NetworkTask(void* arg)
 {
-    static_cast<Network*>(arg)->NetworkLoop();
+    Network* net = static_cast<Network*>(arg);
+    net->NetworkLoop();
+    net->m_networkTaskHandle = nullptr;  // clear before self-delete so Disconnect() won't try to re-delete
     vTaskDelete(nullptr);
 }
 
@@ -422,54 +458,84 @@ void Network::NetworkLoop()
             continue;
         }
 
+        // Data packet from a known peer
         if (packet.playerID != 0)
         {
+            bool isDuplicate = false;
             {
                 std::lock_guard<std::mutex> lock(m_mutex);
                 for (uint8_t i = 0; i < m_peerCount; i++)
                 {
                     if (m_peerIPs[i] != senderIP) continue;
                     m_peerLastSeen[i] = esp_timer_get_time();
-                    // Drop exact duplicate: same sequenceID from the same peer
                     if (packet.sequenceID == m_peerLastSeq[i])
                     {
                         LOG("{Network} Duplicate packet seq=%d from slot %d, dropped", packet.sequenceID, i);
-                        continue;
+                        isDuplicate = true;
                     }
-                    m_peerLastSeq[i] = packet.sequenceID;
+                    else
+                    {
+                        m_peerLastSeq[i] = packet.sequenceID;
+                    }
                     break;
                 }
             }
-            RelayToOtherClients(packet, senderIP);
-            xQueueSend(m_networkQueue, &packet, 0);
+            if (!isDuplicate)
+            {
+                RelayToOtherClients(packet, senderIP);
+                xQueueSend(m_networkQueue, &packet, 0);
+            }
+            continue; // never fall through to handshake
         }
 
-        // Handshake: find the lowest available player ID and reply
-        std::lock_guard<std::mutex> lock(m_mutex);
-        if (m_peerCount >= NET_MAX_PEERS)
+        // playerID == 0: HELLO handshake from client
+        // Re-handshake: client already registered, re-send its player ID
+        uint8_t existingID = 0;
         {
-            LOG("{Network} Rejecting client %08X: session full", senderIP);
+            std::lock_guard<std::mutex> lock(m_mutex);
+            for (uint8_t i = 0; i < m_peerCount; i++)
+            {
+                if (m_peerIPs[i] == senderIP) { existingID = m_peerIDs[i]; break; }
+            }
+        }
+        if (existingID != 0)
+        {
+            NetworkPacket reply = {};
+            reply.playerID = existingID;
+            sendto(m_socket, &reply, sizeof(reply), 0, (struct sockaddr*)&from, fromLen);
+            LOG("{Network} Re-handshake: re-sent player ID %d", existingID);
             continue;
         }
 
-        uint8_t assignedID = 0;
-        for (uint8_t id = 2; id <= NET_MAX_PEERS + 1; id++)
+        // New client: find lowest available player ID and register
         {
-            bool inUse = false;
-            for (uint8_t j = 0; j < m_peerCount; j++)
-                if (m_peerIDs[j] == id) { inUse = true; break; }
-            if (!inUse) { assignedID = id; break; }
+            std::lock_guard<std::mutex> lock(m_mutex);
+            if (m_peerCount >= NET_MAX_PEERS)
+            {
+                LOG("{Network} Rejecting client %08X: session full", senderIP);
+                continue;
+            }
+
+            uint8_t assignedID = 0;
+            for (uint8_t id = 2; id <= NET_MAX_PEERS + 1; id++)
+            {
+                bool inUse = false;
+                for (uint8_t j = 0; j < m_peerCount; j++)
+                    if (m_peerIDs[j] == id) { inUse = true; break; }
+                if (!inUse) { assignedID = id; break; }
+            }
+
+            m_peerIPs[m_peerCount]      = senderIP;
+            m_peerIDs[m_peerCount]      = assignedID;
+            m_peerLastSeen[m_peerCount]  = esp_timer_get_time();
+            m_peerLastSeq[m_peerCount]   = 0xFF; // sentinel: seq=0 won't be a false duplicate
+            m_peerCount++;
+
+            NetworkPacket reply = {};
+            reply.playerID = assignedID;
+            sendto(m_socket, &reply, sizeof(reply), 0, (struct sockaddr*)&from, fromLen);
+            LOG("{Network} Client joined, assigned player ID %d", assignedID);
         }
-
-        m_peerIPs[m_peerCount] = senderIP;
-        m_peerIDs[m_peerCount] = assignedID;
-        m_peerLastSeen[m_peerCount] = esp_timer_get_time();
-        m_peerCount++;
-
-        NetworkPacket reply = {};
-        reply.playerID = assignedID;
-        sendto(m_socket, &reply, sizeof(reply), 0, (struct sockaddr*)&from, fromLen);
-        LOG("{Network} Client joined, assigned player ID %d", assignedID);
     }
 }
 
@@ -494,10 +560,11 @@ void Network::CheckPeerTimeouts()
     std::lock_guard<std::mutex> lock(m_mutex);
     int64_t now = esp_timer_get_time();
 
-    // Iterate backwards so removals don't disturb unvisited slots
     for (int8_t i = (int8_t)m_peerCount - 1; i >= 0; i--)
     {
-        if (now - m_peerLastSeen[i] > (int64_t)NET_PEER_TIMEOUT_MS * 1000LL)
+        int64_t elapsed_ms = (now - m_peerLastSeen[i]) / 1000LL;
+        LOG("{Network} peer slot %d (pid=%d) last seen %lld ms ago", i, m_peerIDs[i], elapsed_ms);
+        if (elapsed_ms > (int64_t)NET_PEER_TIMEOUT_MS)
             RemovePeer((uint8_t)i);
     }
 }
@@ -514,6 +581,19 @@ void Network::RemovePeer(uint8_t peerSlot)
     notification.payload[0] = disconnectedID;
     xQueueSend(m_networkQueue, &notification, 0);
 
+    // Relay the disconnect notification to all remaining peers (called from
+    // CheckPeerTimeouts which already holds m_mutex, so no re-lock needed).
+    for (uint8_t i = 0; i < m_peerCount; i++)
+    {
+        if (i == peerSlot) continue;
+        struct sockaddr_in addr = {};
+        addr.sin_family      = AF_INET;
+        addr.sin_addr.s_addr = m_peerIPs[i];
+        addr.sin_port        = htons(NET_PORT);
+        sendto(m_socket, &notification, sizeof(notification), 0,
+               (struct sockaddr*)&addr, sizeof(addr));
+    }
+
     // Compact the arrays so there are no gaps
     for (uint8_t i = peerSlot; i < m_peerCount - 1; i++)
     {
@@ -523,7 +603,7 @@ void Network::RemovePeer(uint8_t peerSlot)
     }
     m_peerCount--;
 
-    // No peers left means this device is isolated
-    if (m_peerCount == 0)
+    // No peers left: client is isolated; host stays alive to accept reconnects
+    if (m_peerCount == 0 && m_role != NETWORK_ROLE::HOST)
         m_connected = false;
 }

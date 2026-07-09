@@ -82,7 +82,7 @@ bool Keyboard::Init(const std::vector<std::pair<std::string, int>> &keyboardConf
 
 	// Config MCP23017
 	if (!WriteI2CRegister(MCP23017_IODIRA, 0xFF) || !WriteI2CRegister(MCP23017_IODIRB, 0xFF)) {
-		LOGE("{Keyboard}Failed to set I/O direction for MCP23017");
+		LOGE("{Keyboard} Failed to set I/O direction for MCP23017");
 		return false;
 	}
 
@@ -101,31 +101,26 @@ void Keyboard::ProcessInput()
 {
 	uint8_t gpioa, gpiob;
 	if (!ReadI2CRegister(MCP23017_GPIOA, &gpioa) || !ReadI2CRegister(MCP23017_GPIOB, &gpiob)) {
-		LOGE("{Keyboard} Failed to read GPIO state from MCP23017");
+		//LOGE("{Keyboard} Failed to read GPIO state from MCP23017");
 		return;
 	}
 
 	uint16_t keyboardState = (static_cast<uint16_t>(gpiob) << 8) | gpioa;
 	uint16_t pressedKeys = ~keyboardState;
 
-	static uint16_t lastPressedKeys = 0;
-	if (pressedKeys != lastPressedKeys)
-	{
-		char bits[17];
-		for (int i = 0; i < 16; i++)
-			bits[15 - i] = ((pressedKeys >> i) & 1) ? '1' : '0';
-		bits[16] = '\0';
-		LOG("{Keyboard} Raw bits [B15..B0]=%s (gpioa=0x%02X gpiob=0x%02X)", bits, gpioa, gpiob);
-		lastPressedKeys = pressedKeys;
-	}
 
+	m_inputs.fill(0);
 	for (const auto& key : m_keyboard)
 	{
 		int hexValue = HexCharToValue(key.first.back());
 		int value = (pressedKeys >> key.second) & 1;
-		if (value != m_inputs[hexValue])
-			LOG("{Keyboard} Key '%s' (bit %d, hex %X) %s", key.first.c_str(), key.second, hexValue, value ? "pressed" : "released");
-		m_inputs[hexValue] = value;
+		m_inputs[hexValue] |= value;
+	}
+
+	for (int i = 0; i < (int)m_inputs.size(); i++)
+	{
+		if (m_inputs[i] && !m_previousInputs[i])
+			LOG("{Keyboard} Key pressed: %X", i);
 	}
 
 }

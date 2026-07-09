@@ -40,6 +40,9 @@ public:
 
 	void SetExtendedMode(const bool enable);
 	const bool GetExtendedMode() const;
+
+	void FreeSprite();
+	void AllocSprite();
 	
 	void SetActivePlane(const unsigned int plane);
 	const ACTIVEPLANE GetActivePlane() const;

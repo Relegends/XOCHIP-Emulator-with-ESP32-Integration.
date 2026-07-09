@@ -4,10 +4,11 @@
 :macro net-disconnect  { 0xF0 0xA2 }
 :macro net-send        { 0xF0 0xA3 }
 :macro net-recv        { 0xF0 0xA4 }
-:macro net-stat  DEST  { :calc hi { 0xF0 | DEST }  hi 0xA5 }
-:macro net-peers DEST  { :calc hi { 0xF0 | DEST }  hi 0xA6 }
-:macro net-pid   DEST  { :calc hi { 0xF0 | DEST }  hi 0xA7 }
+:macro net-stat  DEST  { :byte { 0xF0 | DEST }  0xA5 }
+:macro net-peers DEST  { :byte { 0xF0 | DEST }  0xA6 }
+:macro net-pid   DEST  { :byte { 0xF0 | DEST }  0xA7 }
 :macro net-wait        { 0xF0 0xA8 }
+:macro debug           { 0xF0 0xAF }
 
 # ----------------------- ALIASES ---------------------------
 :alias ioRegister v0
@@ -15,16 +16,23 @@
 :alias screenY    vD
 
 # ----------------------- CONSTANTS ---------------------------
-:const GRID_X     43
-:const GRID_Y     11
-:const CELL       14
+:const GRID_X     0
+:const GRID_Y     0
+:const CELL       21
 :const PIECE_X    1
 :const PIECE_O    2
 :const EMPTY      0
+:const GAME_LEFT     7
+:const GAME_RIGHT    9
+:const GAME_UP       5
+:const GAME_DOWN     8
+:const GAME_PLACE    0xE
+
 :const MSG_MOVE      1
 :const MSG_RESIGN    2
 :const MSG_SYNC_REQ  3   # client requests state on reconnect
 :const MSG_SYNC      4   # host sends full board + turn state
+:const MSG_KEEPALIVE 5   # heartbeat, ignored by receiver
 
 :calc LINE1X { GRID_X + CELL }
 :calc LINE2X { GRID_X + CELL * 2 }
@@ -32,6 +40,9 @@
 :calc LINE2Y { GRID_Y + CELL * 2 }
 :calc GRID_RIGHT  { GRID_X + CELL * 3 }
 :calc GRID_BOTTOM { GRID_Y + CELL * 3 }
+:calc PIECE_OFF_X { ( CELL - 8 ) / 2 }
+:calc PIECE_OFF_Y { ( CELL - 5 ) / 2 }
+:calc CURSOR_OFF  { ( CELL - 8 ) / 2 }
 
 # ----------------------- MEMORY ---------------------------
 :org 0x300
@@ -41,17 +52,37 @@
 : cursorRow  0
 : cursorCol  0
 : placePrev  0
+: lPrev  0
+: rPrev  0
+: uPrev  0
+: dPrev  0
 : net-tx  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 : net-rx  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 
 # ----------------------- SPRITES ---------------------------
 : sprX       0x82 0x44 0x28 0x44 0x82
-: sprO       0x3C 0x42 0x42 0x42 0x3C
-: sprCursor  0xFF 0x81 0x81 0x81 0x81 0x81 0x81 0xFF
+: sprO       0x3C 0x42 0x42 0x42 0x3C   0x3C 0x42 0x42 0x42 0x3C
+: sprCursor  0xFF 0x81 0x81 0x81 0x81 0x81 0x81 0xFF   0xFF 0x81 0x81 0x81 0x81 0x81 0x81 0xFF
 : sprArrow   0x10 0x30 0x7C 0x30 0x10
+: sprLobSel  0x20 0x70 0xF8
+: sprT  0xF8 0x20 0x20 0x20 0x20
+: sprR  0xE0 0x90 0xE0 0xA0 0x90
+: sprE  0xF0 0x80 0xE0 0x80 0xF0
+: sprS  0x70 0x80 0x60 0x10 0xE0
+: sprN  0x90 0xD0 0xB0 0x90 0x90
+: sprA  0x60 0x90 0xF0 0x90 0x90
+: sprY  0x90 0x90 0x60 0x20 0x20
+: sprLetO  0x70 0x88 0x88 0x88 0x70
+: sprDot   0x00 0x00 0x00 0x00 0x80
+: sprH  0x90 0x90 0xF0 0x90 0x90
+: sprI  0xE0 0x40 0x40 0x40 0xE0
+: sprG  0x70 0x80 0xB0 0x90 0x70
+: sprC  0x70 0x80 0x80 0x80 0x70
 : sprW       0x88 0x88 0xA8 0xD8 0x88
 : sprL       0x80 0x80 0x80 0x80 0xF0
 : sprD       0xE0 0x90 0x90 0x90 0xE0
+: sprM       0x88 0xD8 0xA8 0x88 0x88
+: sprU       0x90 0x90 0x90 0x90 0x60
 : vlineSpr   0x80
 : hlineSpr   0xFF
 
@@ -76,49 +107,128 @@
   i := net-tx
   ioRegister := MSG_SYNC_REQ
   save ioRegister
-  net-send
+  i := net-tx   net-send
 
-  # Wait up to 3 s for the host's MSG_SYNC reply
+  # Wait up to 3 s for the host's MSG_SYNC reply.
+  # Loop because HOST may send MSG_MOVE or keepalives before MSG_SYNC_REQ is
+  # processed (HOST only reads the queue when it enters the wait path after
+  # placing its first move).  Discard everything until MSG_SYNC arrives.
   v0 := 180   delay := v0
-  net-wait
-  if vF == 0 then return            # timeout — proceed with local state
+  : rsSyncLoop
+    net-wait
+    if vF == 0 then return          # 3 s timeout — proceed with local state
 
-  i := net-rx
-  net-recv
-  if vF == 0 then return
+    i := net-rx
+    net-recv
+    if vF == 0 then jump rsSyncLoop # queue drained without a packet, keep waiting
 
-  i := net-rx   load v0
-  if v0 == MSG_SYNC then applySync
+    i := net-rx   load v0
+    if v0 != MSG_SYNC then jump rsSyncLoop   # not the reply we need — discard & loop
+    applySync
+  return
+
+# ----------------------- TITLE ---------------------------
+: drawTitle
+  v1 := 2
+  v0 := 30  i := sprT  sprite v0 v1 5
+  v0 := 36  i := sprR  sprite v0 v1 5
+  v0 := 42  i := sprE  sprite v0 v1 5
+  v0 := 48  i := sprS  sprite v0 v1 5
+  v0 := 56  i := sprE  sprite v0 v1 5
+  v0 := 62  i := sprN  sprite v0 v1 5
+  v0 := 70  i := sprR  sprite v0 v1 5
+  v0 := 76  i := sprA  sprite v0 v1 5
+  v0 := 82  i := sprY  sprite v0 v1 5
+  v0 := 88  i := sprA  sprite v0 v1 5
   return
 
 # ----------------------- LOBBY ---------------------------
 : lobby
+  plane 3
   clear
   plane 1
+  drawTitle
 
-  v0 := 10   v1 := 20
+  plane 2
+  v0 := 47   v1 := 27
   i := sprX   sprite v0 v1 5
-  v0 := 22   v2 := 1
-  i := hex v2   sprite v0 v1 5
 
-  v0 := 80   v1 := 20
+  plane 3
+  v0 := 73   v1 := 27
   i := sprO   sprite v0 v1 5
-  v0 := 92   v2 := 2
-  i := hex v2   sprite v0 v1 5
 
-  v2 := 64   v3 := 0
-  : lobVline
-    i := vlineSpr
-    sprite v2 v3 1
-    v3 += 1
-    if v3 < 64 then jump lobVline
+  # vA = selección: 0=X (host), 1=O (join)
+  # vB = estado anterior LOB_LEFT, vC = estado anterior LOB_RIGHT, vD = anterior GAME_PLACE
+  # vD=1: ignora la pulsación de E que viene del selector de ROM
+  plane 1
+  vA := 0   vB := 0   vC := 0   vD := 1
+  v0 := 48   v1 := 34
+  i := sprLobSel   sprite v0 v1 3
 
   : lobWait
-    v1 := 1
-    if v1 key then jump lobHost
-    v1 := 2
-    if v1 key then jump lobJoin
-    jump lobWait
+    v8 := GAME_LEFT   v1 := 0
+    if v8 key then v1 := 1
+    if v1 == vB then jump lwSkipLeft
+    vB := v1
+    if v1 == 0 then jump lwSkipLeft
+    if vA == 0 then jump lwSkipLeft
+    v0 := 74   v1 := 34   i := sprLobSel   sprite v0 v1 3
+    vA := 0
+    v0 := 48   v1 := 34   i := sprLobSel   sprite v0 v1 3
+    : lwSkipLeft
+
+    v8 := GAME_RIGHT   v1 := 0
+    if v8 key then v1 := 1
+    if v1 == vC then jump lwSkipRight
+    vC := v1
+    if v1 == 0 then jump lwSkipRight
+    if vA == 1 then jump lwSkipRight
+    v0 := 48   v1 := 34   i := sprLobSel   sprite v0 v1 3
+    vA := 1
+    v0 := 74   v1 := 34   i := sprLobSel   sprite v0 v1 3
+    : lwSkipRight
+
+    v8 := GAME_PLACE   v1 := 0
+    if v8 key then v1 := 1
+    if v1 == vD then jump lobWait
+    vD := v1
+    if v1 == 0 then jump lobWait
+    jump lwAccept
+
+  : lwAccept
+  if vA == 0 then jump lwAcceptX
+
+  # O seleccionado → CONNECTING... (centrado, y=54)
+  v1 := 54
+  v0 := 28  i := sprC      sprite v0 v1 5
+  v0 := 34  i := sprLetO   sprite v0 v1 5
+  v0 := 40  i := sprN      sprite v0 v1 5
+  v0 := 46  i := sprN      sprite v0 v1 5
+  v0 := 52  i := sprE      sprite v0 v1 5
+  v0 := 58  i := sprC      sprite v0 v1 5
+  v0 := 64  i := sprT      sprite v0 v1 5
+  v0 := 70  i := sprI      sprite v0 v1 5
+  v0 := 76  i := sprN      sprite v0 v1 5
+  v0 := 82  i := sprG      sprite v0 v1 5
+  v0 := 89  i := sprDot    sprite v0 v1 5
+  v0 := 92  i := sprDot    sprite v0 v1 5
+  v0 := 95  i := sprDot    sprite v0 v1 5
+  jump lobJoin
+
+  : lwAcceptX
+  # X seleccionado → HOSTING... (centrado, y=54)
+  v1 := 54
+  v0 := 37  i := sprH      sprite v0 v1 5
+  v0 := 43  i := sprLetO   sprite v0 v1 5
+  v0 := 49  i := sprS      sprite v0 v1 5
+  v0 := 55  i := sprT      sprite v0 v1 5
+  v0 := 61  i := sprI      sprite v0 v1 5
+  v0 := 67  i := sprN      sprite v0 v1 5
+  v0 := 73  i := sprG      sprite v0 v1 5
+  v0 := 80  i := sprDot    sprite v0 v1 5
+  v0 := 83  i := sprDot    sprite v0 v1 5
+  v0 := 86  i := sprDot    sprite v0 v1 5
+  jump lobHost
 
 : lobHost
   net-host
@@ -140,10 +250,16 @@
 
 : lobError
   net-disconnect
-  clear   plane 1
-  v0 := 0xE   v2 := 56   v3 := 28
-  i := bighex v0   sprite v2 v3 10
-  v0 := 120   delay := v0
+  plane 3   clear   plane 1
+  v1 := 29
+  v0 := 43  i := sprT      sprite v0 v1 5
+  v0 := 49  i := sprI      sprite v0 v1 5
+  v0 := 55  i := sprM      sprite v0 v1 5
+  v0 := 61  i := sprE      sprite v0 v1 5
+  v0 := 67  i := sprLetO   sprite v0 v1 5
+  v0 := 73  i := sprU      sprite v0 v1 5
+  v0 := 79  i := sprT      sprite v0 v1 5
+  v0 := 90   delay := v0
   : lobErrWait
     v0 := delay
     if v0 != 0 then jump lobErrWait
@@ -168,43 +284,109 @@
 
   v0 := 0
   i := placePrev  save v0
+  i := lPrev  save v3           # clear lPrev/rPrev/uPrev/dPrev (v0..v3 are all 0 here)
+  vE := 0   # keepalive frame counter
 
   # Host (X, player 1) always moves first
   i := myPiece  load v0
   v1 := 0
   if v0 == PIECE_X then v1 := 1
-  i := myTurn save v1
+  v0 := v1                          # save v0 writes 1 byte; save v1 would also corrupt cursorRow
+  i := myTurn   save v0
   return
 
 # ----------------------- GAME LOOP ---------------------------
 : gameLoop
+  plane 3
   clear
   drawBoard
   drawStatusBar
 
+  # Throttle to 60 fps: spin until the delay timer fires (set to 1 frame)
+  v0 := 1   delay := v0
+  : glFrameWait
+    v0 := delay
+    if v0 != 0 then jump glFrameWait
+
   i := myTurn   load v0
   if v0 != 0 then jump glMyTurn
 
-  # Opponent's turn: net-wait suspends until packet or timeout
+  # Opponent's turn: net-wait suspends until packet or timeout (1 second)
   v0 := 60   delay := v0
   net-wait
-  if vF == 0 then jump gameLoop # timeout → redraw and keep waiting
+  if vF != 0 then jump glGotPacket
+
+  # Timeout: check connectivity; send keepalive if still up, go to lobby if not
+  net-stat v0
+  v1 := 0x80   v0 &= v1
+  if v0 == 0 then jump glDisconnected
+  i := net-tx
+  ioRegister := MSG_KEEPALIVE
+  save ioRegister
+  i := net-tx   net-send
+  jump gameLoop
+
+  : glDisconnected
+  i := myPiece   load v0
+  if v0 == PIECE_X then jump glHostWaitReconnect
+
+  # Client: host disconnected — show message and reset
+  net-disconnect
+  plane 3   clear   plane 1
+  v1 := 24
+  v0 := 34  i := sprH      sprite v0 v1 5
+  v0 := 40  i := sprLetO   sprite v0 v1 5
+  v0 := 46  i := sprS      sprite v0 v1 5
+  v0 := 52  i := sprT      sprite v0 v1 5
+  v1 := 36
+  v0 := 34  i := sprL      sprite v0 v1 5
+  v0 := 40  i := sprLetO   sprite v0 v1 5
+  v0 := 46  i := sprS      sprite v0 v1 5
+  v0 := 52  i := sprT      sprite v0 v1 5
+  v0 := 90   delay := v0
+  : gldWait
+    v0 := delay
+    if v0 != 0 then jump gldWait
+  jump restart
+
+  : glGotPacket
 
   i := net-rx
   net-recv
   if vF == 0 then jump gameLoop
 
+  # Check playerID byte (at net-rx+16): 0xFF = disconnect notification
+  v2 := 16   i := net-rx   i += v2   load v0
+  if v0 == 0xFF then jump glDisconnected
+
   i := net-rx    load v1   # v0=type, v1=cell index
+  # DBG dispatch: v0=type v1=cell
+  debug
   if v0 == MSG_RESIGN   then jump showLoserScreen
   if v0 == MSG_SYNC_REQ then jump glSendSync    # opponent reconnected
-  if v0 != MSG_MOVE     then jump gameLoop       # unknown type, ignore
+  if v0 == MSG_MOVE     then jump glApplyOpponentMove
+  # Non-move packet (keepalive, sync…): reply with keepalive so host peer
+  # timeout doesn't fire while host is in glMyTurn sending keepalives to us.
+  i := net-tx
+  ioRegister := MSG_KEEPALIVE
+  save ioRegister
+  i := net-tx   net-send
+  jump gameLoop
 
+  : glApplyOpponentMove
+  # DBG A: entry — v0=type(1) v1=cell v2=prev
+  debug
+  # Reject move if cell already occupied (desync guard)
+  i := board   i += v1   load v0
+  if v0 != EMPTY then jump gameLoop
   # Apply opponent's move to the board
   i := myPiece   load v0
   v2 := 3   v2 -= v0               # opponent piece = 3 - myPiece
   ioRegister := v2
   i := board   i += v1
   save ioRegister
+  # DBG B: after board write — v0=piece v1=cell(may drift) v2=piece
+  debug
 
   v9 := v2
   checkWin
@@ -214,20 +396,44 @@
   if vF != 0 then jump showDrawScreen
 
   v0 := 1   i := myTurn   save v0
+  # DBG C: myTurn set to 1 — v0=1
+  debug
   jump gameLoop
 
   : glMyTurn
   handleMyTurn
-  if v9 == 0xFF then jump gameLoop  # no move made this frame
+  if v9 != 0xFF then jump glPlaceMove
 
-  # Send the move to the opponent
+  # No move this frame: check for incoming packets (handles reconnect sync req)
+  i := net-rx
+  net-recv
+  if vF == 0 then jump gmtNoPacket
+  i := net-rx   load v0
+  if v0 == MSG_SYNC_REQ then jump glSendSync
+  : gmtNoPacket
+
+  # Keepalive every ~60 frames (1 s)
+  vE += 1
+  if vE != 60 then jump gameLoop
+  vE := 0
+  net-stat v0
+  v1 := 0x80   v0 &= v1
+  if v0 == 0 then jump glDisconnected
+  i := net-tx
+  ioRegister := MSG_KEEPALIVE
+  save ioRegister
+  i := net-tx   net-send
+  jump gameLoop
+
+  : glPlaceMove
+  vE := 0
   i := net-tx
   ioRegister := MSG_MOVE
   v1 := v9
   save v1
-  net-send
+  i := net-tx   net-send
 
-  i := myPiece   load v9
+  i := myPiece   load v0   v9 := v0   # load only myPiece; load v9 would clobber v9 with net-tx[4]
   checkWin
   if vF != 0 then jump showWinScreen # Player's win
 
@@ -244,36 +450,52 @@
 : handleMyTurn
   v9 := 0xFF
 
-  # Left
-  v8 := 4
-  if v8 -key then jump hmRight
+  # Left (move only on new press, not while held)
+  v8 := GAME_LEFT   v1 := 0
+  if v8 key then v1 := 1
+  i := lPrev   load v0   v2 := v0
+  v0 := v1   i := lPrev   save v0
+  if v1 == 0 then jump hmRight
+  if v2 != 0 then jump hmRight
   i := cursorCol   load v0
   if v0 == 0 then jump hmRight
   v0 -= 1   i := cursorCol   save v0
 
   : hmRight
-  v8 := 6
-  if v8 -key then jump hmUp
+  v8 := GAME_RIGHT   v1 := 0
+  if v8 key then v1 := 1
+  i := rPrev   load v0   v2 := v0
+  v0 := v1   i := rPrev   save v0
+  if v1 == 0 then jump hmUp
+  if v2 != 0 then jump hmUp
   i := cursorCol   load v0
   if v0 == 2 then jump hmUp
   v0 += 1   i := cursorCol   save v0
 
   : hmUp
-  v8 := 2
-  if v8 -key then jump hmDown
+  v8 := GAME_UP   v1 := 0
+  if v8 key then v1 := 1
+  i := uPrev   load v0   v2 := v0
+  v0 := v1   i := uPrev   save v0
+  if v1 == 0 then jump hmDown
+  if v2 != 0 then jump hmDown
   i := cursorRow   load v0
   if v0 == 0 then jump hmDown
   v0 -= 1   i := cursorRow   save v0
 
   : hmDown
-  v8 := 8
-  if v8 -key then jump hmPlace
+  v8 := GAME_DOWN   v1 := 0
+  if v8 key then v1 := 1
+  i := dPrev   load v0   v2 := v0
+  v0 := v1   i := dPrev   save v0
+  if v1 == 0 then jump hmPlace
+  if v2 != 0 then jump hmPlace
   i := cursorRow   load v0
   if v0 == 2 then jump hmPlace
   v0 += 1   i := cursorRow   save v0
 
   : hmPlace
-  v8 := 5   v1 := 0
+  v8 := GAME_PLACE   v1 := 0
   if v8 key then v1 := 1
 
   i := placePrev   load v0   v2 := v0
@@ -303,40 +525,47 @@
 
 # ----------------------- DRAW BOARD ---------------------------
 : drawBoard
-  plane 1
   drawBoardGrid
   drawBoardPieces
   drawCursor
   return
 
 : drawBoardGrid
-  # Vertical line 1
-  v2 := LINE1X   v3 := GRID_Y
+  plane 1
+  # Vertical line 1 — full screen height
+  v2 := LINE1X   v3 := 0
   : dbgVl1
     i := vlineSpr   sprite v2 v3 1
     v3 += 1
-    if v3 < GRID_BOTTOM then jump dbgVl1
+    if v3 != 64 then jump dbgVl1
 
-  # Vertical line 2
-  v2 := LINE2X   v3 := GRID_Y
+  # Vertical line 2 — full screen height
+  v2 := LINE2X   v3 := 0
   : dbgVl2
     i := vlineSpr   sprite v2 v3 1
     v3 += 1
-    if v3 < GRID_BOTTOM then jump dbgVl2
+    if v3 != 64 then jump dbgVl2
 
-  # Horizontal line 1
-  v2 := GRID_X   v3 := LINE1Y
+  # Horizontal line 1 — grid width only (x=0..63)
+  v2 := 0   v3 := LINE1Y
   : dbgHl1
     i := hlineSpr   sprite v2 v3 1
     v2 += 8
-    if v2 < GRID_RIGHT then jump dbgHl1
+    if v2 != 64 then jump dbgHl1
 
-  # Horizontal line 2
-  v2 := GRID_X   v3 := LINE2Y
+  # Horizontal line 2 — grid width only
+  v2 := 0   v3 := LINE2Y
   : dbgHl2
     i := hlineSpr   sprite v2 v3 1
     v2 += 8
-    if v2 < GRID_RIGHT then jump dbgHl2
+    if v2 != 64 then jump dbgHl2
+
+  # Vertical separator between grid and status area
+  v2 := 64   v3 := 0
+  : dbgSep
+    i := vlineSpr   sprite v2 v3 1
+    v3 += 1
+    if v3 != 64 then jump dbgSep
 
   return
 
@@ -360,7 +589,7 @@
         screenX += CELL   v4 += 1
         jump dbpSX
       : dbpSXDone
-      screenX += GRID_X   screenX += 3
+      screenX += GRID_X   screenX += PIECE_OFF_X
 
       screenY := 0   v4 := 0
       : dbpSY
@@ -368,8 +597,10 @@
         screenY += CELL   v4 += 1
         jump dbpSY
       : dbpSYDone
-      screenY += GRID_Y   screenY += 4
+      screenY += GRID_Y   screenY += PIECE_OFF_Y
 
+      plane 2
+      if v8 == PIECE_O then plane 3
       i := sprX
       if v8 == PIECE_O then i := sprO
       sprite screenX screenY 5
@@ -391,7 +622,7 @@
     screenX += CELL   v6 += 1
     jump dcSX
   : dcSXDone
-  screenX += GRID_X
+  screenX += GRID_X   screenX += CURSOR_OFF
 
   screenY := 0   v6 := 0
   : dcSY
@@ -399,56 +630,60 @@
     screenY += CELL   v6 += 1
     jump dcSY
   : dcSYDone
-  screenY += GRID_Y
+  screenY += GRID_Y   screenY += CURSOR_OFF
 
   i := myTurn   load v0
+  if v0 == 0 then return
+  i := myPiece   load v0
+  plane 2
+  if v0 == PIECE_O then plane 3
   i := sprCursor
   sprite screenX screenY 8
   return
 
 # ----------------------- STATUS BAR ---------------------------
-# Uses net-stat to read the compressed session state byte:
-#   bit 7 = connected   bit 6 = I am HOST
-#   bits 3-2 = peer count   bits 1-0 = playerID-1
+# Shows both piece symbols with an arrow (→) next to whoever is active.
+# X and O are always visible; the arrow makes the current turn obvious.
 : drawStatusBar
-  plane 1
-
-  # Read status byte with net-stat (opcode FxA5)
   net-stat v0
-  v9 := v0
+  v1 := v0   v1 <<= v1
+  if vF == 0 then jump dsbDisconnected   # bit7=0: not connected at all
 
-  # Test connected
-  v1 := v9   v1 <<= v1
-  if vF == 0 then jump dsbDisconnected
+  # Connected — check peer count (bits 3-2)
+  v2 := v0   v3 := 0x0C   v2 &= v3
+  if v2 == 0 then jump dsbWaiting        # connected but opponent gone
 
-  # My piece symbol (X or O)
-  v2 := 94   v3 := 5
-  i := myPiece   load v0
-  i := sprX
-  if v0 == PIECE_O then i := sprO
-  sprite v2 v3 5
+  # Draw X piece symbol in X color (plane 2)
+  plane 2
+  v2 := 94   v3 := 6
+  i := sprX   sprite v2 v3 5
 
-  # Turn indicator
-  v2 := 94   v3 := 16
-  i := myTurn   load v0
-  if v0 == 0 then jump dsbTheirTurn
-  i := sprArrow   sprite v2 v3 5    # arrow = my turn
-  jump dsbPeers
-  : dsbTheirTurn
-  # Empty: waiting for opponent
+  # Draw O piece symbol in O color (plane 3)
+  plane 3
+  v2 := 94   v3 := 20
+  i := sprO   sprite v2 v3 5
 
-  # Peer count from bits 3-2 of the net-stat byte
-  : dsbPeers
-  v1 := v9
-  v8 := 0x0C   v1 &= v8             # mask bits 3-2
-  v1 >>= v1   v1 >>= v1             # shift right 2 → value 0-2
-  v2 := 94   v3 := 27
-  i := hex v1   sprite v2 v3 5      # hex digit
+  # Arrow in grid/text color (plane 1)
+  plane 1
+  i := myPiece   load v0   v4 := v0
+  i := myTurn    load v0
+  if v0 != 0 then jump dsbDrawArrow
+  v2 := 3   v2 -= v4   v4 := v2
+  : dsbDrawArrow
+  v2 := 86   v3 := 6
+  if v4 == PIECE_O then v3 := 20
+  i := sprArrow   sprite v2 v3 5
+  return
+
+  : dsbWaiting
+  plane 1
+  v2 := 94   v3 := 6
+  i := sprX   sprite v2 v3 5
+  v2 := 94   v3 := 20
+  i := sprO   sprite v2 v3 5
   return
 
   : dsbDisconnected
-  v2 := 94   v3 := 5
-  v0 := 0xF   i := hex v0   sprite v2 v3 5   # 'F' = connection error
   return
 
 # ----------------------- STATE SYNC ---------------------------
@@ -466,7 +701,7 @@
   i := myTurn   load v0
   v9 := 10   i := net-tx   i += v9
   save v0                           # net-tx[10] = host's myTurn
-  net-send
+  i := net-tx   net-send
   return
 
 # Host receives MSG_SYNC_REQ: send state and return to wait loop
@@ -486,7 +721,8 @@
   v9 := 10   i := net-rx   i += v9
   load v0                           # v0 = host's myTurn
   v1 := 1   v1 -= v0
-  i := myTurn   save v1
+  v0 := v1                          # save v0 writes only 1 byte; save v1 would corrupt cursorRow
+  i := myTurn   save v0
   return
 
 # ----------------------- CHECK WIN ---------------------------
@@ -576,27 +812,29 @@
 
 # ----------------------- RESULT SCREENS ---------------------------
 : showWinScreen
-  clear   plane 1
-  v0 := 0xA   v2 := 52   v3 := 22
-  i := bighex v0   sprite v2 v3 10
-  v2 := 34   v3 := 18
-  i := sprW   sprite v2 v3 5
+  plane 3   clear   plane 1
+  v1 := 29
+  v0 := 55  i := sprW   sprite v0 v1 5
+  v0 := 61  i := sprI   sprite v0 v1 5
+  v0 := 67  i := sprN   sprite v0 v1 5
   jump resultWait
 
 : showLoserScreen
-  clear   plane 1
-  v2 := 34   v3 := 18
-  i := sprL   sprite v2 v3 5
-  v0 := 0xE   v2 := 52   v3 := 22
-  i := bighex v0   sprite v2 v3 10
+  plane 3   clear   plane 1
+  v1 := 29
+  v0 := 52  i := sprL      sprite v0 v1 5
+  v0 := 58  i := sprLetO   sprite v0 v1 5
+  v0 := 64  i := sprS      sprite v0 v1 5
+  v0 := 70  i := sprE      sprite v0 v1 5
   jump resultWait
 
 : showDrawScreen
-  clear   plane 1
-  v2 := 34   v3 := 18
-  i := sprD   sprite v2 v3 5
-  v0 := 0xD   v2 := 52   v3 := 22
-  i := bighex v0   sprite v2 v3 10
+  plane 3   clear   plane 1
+  v1 := 29
+  v0 := 52  i := sprD   sprite v0 v1 5
+  v0 := 58  i := sprR   sprite v0 v1 5
+  v0 := 64  i := sprA   sprite v0 v1 5
+  v0 := 70  i := sprW   sprite v0 v1 5
   jump resultWait
 
 : resultWait
@@ -604,9 +842,21 @@
   : rwDelay
     v0 := delay
     if v0 != 0 then jump rwDelay
-  # Wait for any key press before returning to lobby
-  : rwKey
-    v1 := 5
-    if v1 -key then jump rwKey
   net-disconnect
   jump restart
+
+# Host stays connected and polls until the client comes back
+: glHostWaitReconnect
+  net-peers v0
+  if v0 != 0 then jump ghwrReconnected
+  plane 3   clear
+  drawBoard
+  drawStatusBar
+  v0 := 30   delay := v0
+  : ghwrWait
+    v0 := delay
+    if v0 != 0 then jump ghwrWait
+  jump glHostWaitReconnect
+  : ghwrReconnected
+  sendBoardSync             # share full board with reconnecting client
+  jump gameLoop
