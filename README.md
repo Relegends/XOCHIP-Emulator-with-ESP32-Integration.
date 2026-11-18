@@ -2,7 +2,7 @@
 
 Emulador de CHIP-8 / SCHIP / XO-CHIP con dos versiones: una para **Windows** (Visual Studio 2022 + SDL2) y otra para **ESP32** (PlatformIO + pantalla ILI9341, teclado MCP23017, tarjeta SD y audio).
 
-<img width="1599" height="1600" alt="image" src="https://github.com/user-attachments/assets/fe6254d0-6e15-4237-b02b-b0e0a758007a" />
+<img width="908" height="491" alt="image" src="https://github.com/user-attachments/assets/7fc64a68-66e9-439a-a548-eb5f04d43513" />
 
 ---
 
